@@ -17,6 +17,9 @@ namespace KOTHFivem
 
             RegisterNuiCallbackType("toggleMenuVisibility");
             RegisterNuiCallbackType("toggleTeamSelection");
+            RegisterNuiCallbackType("teamSelection");
+
+            Exports["spawnmanager"].setAutoSpawn(false);
         }
 
         [EventHandler("onClientResourceStart")]
@@ -25,14 +28,14 @@ namespace KOTHFivem
             if (name.Equals(GetCurrentResourceName()))
             {
                 Debug.WriteLine("Bem-vindo ao servidor de King of the Hill do Faded!");
-                SetNuiFocus(isMenuOpen, isMenuOpen);
+                //SetNuiFocus(isMenuOpen, isMenuOpen);
             }
         }
-        
+
         [EventHandler("playerDropped")]
         void onPlayerDropped(Player player, string reason)
         {
-            TriggerServerEvent("KOTH:OnPlayerDrop", true);
+            TriggerServerEvent("KOTH:OnPlayerDrop", player);
         }
 
         [EventHandler("onPlayerConnected")]
@@ -41,9 +44,14 @@ namespace KOTHFivem
         [EventHandler("__cfx_nui:toggleTeamSelection")]
         void onToggleTeamSelection(IDictionary<string, object> data, CallbackDelegate cb)
         {
+            /*
+             * Handle all the spawn/re-spawn logic here. 
+             * - Select the appropriate model for the selected faction
+             * - Spawn player at current faction spawn location
+             */
             Debug.WriteLine("toggleTeamSelection called!");
             isFactionSelectionOpen = !isFactionSelectionOpen;
-            SetNuiFocus(isFactionSelectionOpen, isFactionSelectionOpen);
+            Exports["spawnmanager"].spawnPlayer();
             cb(new
             {
                 ok = true
@@ -65,8 +73,33 @@ namespace KOTHFivem
         [Tick]
         async Task ToggleMenuVisibility()
         {
+            if (IsControlPressed(0, 288))
+            {
+                isMenuOpen = !isMenuOpen;
+                string msg = JsonConvert.SerializeObject(new { type = "menu_toggle" });
+                SendNuiMessage(msg);
+                SetNuiFocus(isMenuOpen, isMenuOpen);
+            }
             await Delay(0);
         }
-        
+
+        [EventHandler("__cfx_nui:teamSelection")]
+        void onSelectTeam(IDictionary<string, object> data, CallbackDelegate cb)
+        {
+            if (!data.TryGetValue("team_id", out var teamIdObj))
+            {
+                cb(new { error = "invalid team" });
+                return;
+            }
+
+            var team_id = (teamIdObj as string) ?? "";
+
+            Debug.WriteLine($"Team id: {team_id}");
+
+            cb(new
+            {
+                ok = true
+            });
+        }
     }
 }
