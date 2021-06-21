@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "koth_client", "KOTHFivem\ko
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "koth_server", "koth_server\koth_server.csproj", "{45FA5C33-74E1-4FFC-B71C-0DCDD50E7EE5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "koth_shared", "koth_shared\koth_shared.csproj", "{A5B3BCAF-1B74-43E2-9263-AD12ED9B353F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{45FA5C33-74E1-4FFC-B71C-0DCDD50E7EE5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{45FA5C33-74E1-4FFC-B71C-0DCDD50E7EE5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{45FA5C33-74E1-4FFC-B71C-0DCDD50E7EE5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5B3BCAF-1B74-43E2-9263-AD12ED9B353F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5B3BCAF-1B74-43E2-9263-AD12ED9B353F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5B3BCAF-1B74-43E2-9263-AD12ED9B353F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5B3BCAF-1B74-43E2-9263-AD12ED9B353F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

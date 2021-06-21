@@ -7,11 +7,11 @@ using static CitizenFX.Core.Native.API;
 
 namespace KOTHFivem
 {
-    class Main : BaseScript
+    class Client : BaseScript
     {
         bool isFactionSelectionOpen = false;
         bool isMenuOpen = true;
-        public Main()
+        public Client()
         {
             Debug.WriteLine("Starting up KOTH...");
 
@@ -88,18 +88,28 @@ namespace KOTHFivem
         {
             if (!data.TryGetValue("team_id", out var teamIdObj))
             {
-                cb(new { error = "invalid team" });
+                cb(new { error = "invalid team", ok = false });
                 return;
             }
 
             var team_id = (teamIdObj as string) ?? "";
 
             Debug.WriteLine($"Team id: {team_id}");
+            Debug.WriteLine("selectTeam event called.");
+
+            TriggerServerEvent("koth:teamJoin", team_id);
 
             cb(new
             {
-                ok = true
+                ok = true,
             });
+        }
+
+        [EventHandler("koth:updateTeamCount")]
+        void onUpdateTeamCount(int team_id, int new_count)
+        {
+            Debug.WriteLine($"Updating player count for team {team_id}.");
+            SendNuiMessage(JsonConvert.SerializeObject(new { type = "update", team_id = team_id, new_count = new_count }));
         }
     }
 }
