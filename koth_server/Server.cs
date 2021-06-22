@@ -3,22 +3,35 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
-
+using System.Threading.Tasks;
 using static CitizenFX.Core.Native.API;
 
 namespace koth_server
 {
+    enum STATE_UPDATE_TYPE : int
+    {
+        PLAYER_JOIN,
+        PLAYER_LEAVE,
+        TEAM_JOIN,
+        TEAM_LEAVE,
+        PLAYER_DEATH,
+        PLAYER_KILL,
+        FLAG_POINT,
+        TEAM_POINT
+    }
     class Server : BaseScript
     {
         Dictionary<Player, KothPlayer> players = new Dictionary<Player, KothPlayer>();
         List<KothTeam> teams = new List<KothTeam>();
+        readonly string[] update_endpoints = { "player_join", "player_leave", "team_join", "team_leave", "player_death", "player_kill", "flag_point", "team_point" };
         public Server()
         {
             Debug.WriteLine("server main started!");
             Debug.WriteLine("setting up stuff");
-            teams.Add(new KothTeam(1, "AEGIS Corp.", new Vector2(0.0f, 0.0f)));
-            teams.Add(new KothTeam(2, "FARC", new Vector2(0.0f, 0.0f)));
-            teams.Add(new KothTeam(3, "Delta Force", new Vector2(0.0f, 0.0f)));
+            teams.Add(new KothTeam(0, "", new Vector3()));
+            teams.Add(new KothTeam(1, "AEGIS Corp.", new Vector3(1523.32f, 2250.2f, 189.0f)));
+            teams.Add(new KothTeam(2, "FARC", new Vector3()));
+            teams.Add(new KothTeam(3, "Delta Force", new Vector3()));
         }
 
         [EventHandler("playerJoining")]
@@ -65,10 +78,12 @@ namespace koth_server
 
             var team = teams.Find((t) => t.team_id == int_teamid);
 
-            team.Join(players[player]);
+            players[player].JoinTeam(team);
 
             Debug.WriteLine($"teamJoin called by {player.Identifiers} with team id {team_id}");
-
+            /* x */                 /* y */              /* heading */
+            player.TriggerEvent("koth:playerJoinedTeam", team.spawn_region.X, team.spawn_region.Y, team.spawn_region.Z, GetHashKey("a_f_m_fatbla_01"));
+            TriggerClientEvent("chat:addMessage", new { args = "You have spawned! Congrats!" });
         }
 
         [EventHandler("onResourceStart")]
@@ -80,8 +95,13 @@ namespace koth_server
                 {
                     Debug.WriteLine($"Adding players to player list after restart.");
                     players.Add(p, new KothPlayer(p));
-                }                
+                }
             }
+        }
+
+        void UpdateGameState(string new_state, STATE_UPDATE_TYPE type)
+        {
+            
         }
     }
 }

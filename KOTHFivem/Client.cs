@@ -1,4 +1,5 @@
 ﻿using CitizenFX.Core;
+using CitizenFX.Core.Native;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -18,7 +19,6 @@ namespace KOTHFivem
             RegisterNuiCallbackType("toggleMenuVisibility");
             RegisterNuiCallbackType("toggleTeamSelection");
             RegisterNuiCallbackType("teamSelection");
-
             Exports["spawnmanager"].setAutoSpawn(false);
         }
 
@@ -28,42 +28,26 @@ namespace KOTHFivem
             if (name.Equals(GetCurrentResourceName()))
             {
                 Debug.WriteLine("Bem-vindo ao servidor de King of the Hill do Faded!");
-                //SetNuiFocus(isMenuOpen, isMenuOpen);
+                SetNuiFocus(isMenuOpen, isMenuOpen);
             }
         }
-
-        [EventHandler("playerDropped")]
-        void onPlayerDropped(Player player, string reason)
-        {
-            TriggerServerEvent("KOTH:OnPlayerDrop", player);
-        }
-
-        [EventHandler("onPlayerConnected")]
-        void onPlayerConnected() { }
 
         [EventHandler("__cfx_nui:toggleTeamSelection")]
         void onToggleTeamSelection(IDictionary<string, object> data, CallbackDelegate cb)
         {
-            /*
-             * Handle all the spawn/re-spawn logic here. 
-             * - Select the appropriate model for the selected faction
-             * - Spawn player at current faction spawn location
-             */
             Debug.WriteLine("toggleTeamSelection called!");
             isFactionSelectionOpen = !isFactionSelectionOpen;
-            Exports["spawnmanager"].spawnPlayer();
             cb(new
             {
                 ok = true
             });
         }
 
-        [EventHandler("__cfx_nui:toggleMenuVisibility")]
-        void onToggleMenuVisibility(IDictionary<string, object> data, CallbackDelegate cb)
+        [EventHandler("__cfx_nui:toggleMenu")]
+        void onToggleMenu(IDictionary<string, object> data, CallbackDelegate cb)
         {
-            Debug.WriteLine("Toggling all the way..");
+            Debug.WriteLine("toggleMenu called!");
             isMenuOpen = !isMenuOpen;
-            SetNuiFocus(isMenuOpen, isMenuOpen);
             cb(new
             {
                 ok = true
@@ -71,7 +55,7 @@ namespace KOTHFivem
         }
 
         [Tick]
-        async Task ToggleMenuVisibility()
+        async Task ToggleMenu()
         {
             if (IsControlPressed(0, 288))
             {
@@ -110,6 +94,20 @@ namespace KOTHFivem
         {
             Debug.WriteLine($"Updating player count for team {team_id}.");
             SendNuiMessage(JsonConvert.SerializeObject(new { type = "update", team_id = team_id, new_count = new_count }));
+        }
+
+        [EventHandler("koth:playerJoinedTeam")]
+        void onPlayerJoinedTeam(float x, float y, float heading, int model)
+        {
+            Debug.WriteLine("called : ");
+            Debug.WriteLine($"Spawning at {x}, {y}, {isMenuOpen}");
+
+            Exports["spawnmanager"].spawnPlayer(new { x = 21.001f, y = -40.001f, z = 75.001f, heading = 180.01f, model = model });
+
+            isMenuOpen = !isMenuOpen;
+            SetNuiFocus(isMenuOpen, isMenuOpen);
+
+            SendNuiMessage(JsonConvert.SerializeObject(new { type = "menu_toggle" }));
         }
     }
 }

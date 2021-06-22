@@ -11,7 +11,7 @@ namespace koth_server
      * Represents a player inside the game.
      * Not to be mistaken with `Player` provided by CFX
      */
-    class KothPlayer
+    class KothPlayer : BaseScript
     {
         public Player base_player { get; private set; }
         public string player_license { get; private set; }
@@ -22,9 +22,7 @@ namespace koth_server
         public int session_kills { get; private set; }
         public int session_deaths { get; private set; }
         public int session_money { get; private set; }
-#nullable enable
-        public KothTeam? curr_team { get; private set; }
-#nullable disable
+        public KothTeam curr_team { get; private set; }
         //public Squad curr_squad { get; private set; }
         public DateTime join_time { get; private set; }
         public DateTime leave_time { get; set; }
@@ -34,7 +32,7 @@ namespace koth_server
             base_player = player;
             join_time = DateTime.UtcNow;
             player_license = Utils.GetPlayerLicense(base_player.Identifiers);
-            curr_team = null;
+            curr_team = new KothTeam(0, "", new Vector3());
             Debug.WriteLine($"Player joined server at {join_time}");
         }
 
@@ -47,10 +45,24 @@ namespace koth_server
             Debug.WriteLine($"Player leaving server at {leave_time}.");
         }
 
-        public void SetTeam(KothTeam t)
+        public bool JoinTeam(KothTeam t)
         {
-            curr_team = t;
-            Debug.WriteLine($"Player {base_player.Name} joined {t.team_name} ({t.team_id})");
+            if (t != curr_team)
+            {
+                LeaveTeam();
+                curr_team = t;
+                t.players.Add(this);
+                Debug.WriteLine($"Player {base_player.Name} joined team {curr_team.team_name}");
+                TriggerClientEvent(base_player, "koth:updateTeamCount", t.team_id, t.players.Count);
+                return true;
+            }
+            return false;
+        }
+
+        public void LeaveTeam()
+        {
+            Debug.WriteLine($"Player {base_player.Name} left team {curr_team.team_name}");
+            curr_team.players.Remove(this);
         }
     }
 }
