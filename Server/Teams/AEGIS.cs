@@ -2,13 +2,13 @@
 
 using static CitizenFX.Core.Native.API;
 
-namespace koth_server.Teams
+namespace Server.Teams
 {
     class AEGIS : KothTeam
     {
         public AEGIS ( ) : base(1, "AEGIS Corp.", new(), (uint)GetHashKey("s_m_y_marine_03"))
         {
-            team_base.spawn_points.Enqueue(new Spawn(new float[] { -1315.25f, 278.37f, 63.67f, 268.84f },
+            Base.SpawnPoints.Enqueue(new Spawn(new float[] { -1315.25f, 278.37f, 63.67f, 268.84f },
                   new List<float[]>() { new float[] { -1291.29f, 285.36f, 64.8f, 253.87f },
                                         new float[] { -1293.44f, 282.07f, 64.79f, 253.87f },
                                         new float[] {-1288.82f, 291.33f, 64.81f, 234.83f } },

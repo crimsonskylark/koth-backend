@@ -1,6 +1,6 @@
 ﻿using CitizenFX.Core;
-using koth_server.Teams;
-using koth_server.User;
+using Server.Teams;
+using Server.User;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -8,32 +8,37 @@ using System.Dynamic;
 using System.Linq;
 using System.Threading.Tasks;
 using static CitizenFX.Core.Native.API;
+using Shared;
 
-namespace koth_server
+
+namespace Server
 {
-    enum STATE_UPDATE_TYPE : int
+    enum StateUpdate : int
     {
-        PLAYER_JOIN,
-        PLAYER_LEAVE,
-        TEAM_JOIN,
-        TEAM_LEAVE,
-        PLAYER_DEATH,
-        PLAYER_KILL,
-        FLAG_POINT,
-        TEAM_POINT
+        PlayerJoin,
+        PlayerLeave,
+        PlayerDeath,
+        PlayerKill,
+        PlayerOnHill,
+        TeamJoin,
+        TeamLeave,
+        TeamPoint,
+        HillCaptured,
+        HillLost,
+        HillContested
     }
     class Server : BaseScript
     {
-        Dictionary<Player, KothPlayer> players = new();
-        List<KothTeam> teams = new();
+        Dictionary<Player, KothPlayer> ServerPlayers = new();
+        List<KothTeam> Teams = new();
 
-        readonly string[] update_endpoints = { "player_join", "player_leave", "team_join", "team_leave", "player_death", "player_kill", "flag_point", "team_point" };
+
         public Server ( )
         {
             Debug.WriteLine("server main started!");
             Debug.WriteLine("setting up stuff");
-            teams.Add(new KothTeam());
-            teams.Add(new AEGIS());
+            Teams.Add(new KothTeam());
+            Teams.Add(new AEGIS());
         }
 
         #region GameEvents
@@ -41,17 +46,17 @@ namespace koth_server
         void onPlayerJoining ( [FromSource] Player player, string old_id )
         {
             Debug.WriteLine($"Player {player.Handle} has joined the server.");
-            players.Add(player, new KothPlayer(player));
+            ServerPlayers.Add(player, new KothPlayer(player));
         }
 
         [EventHandler("playerDropped")]
         void onPlayerDropped ( [FromSource] Player player, string reason )
         {
-            if (players.TryGetValue(player, out KothPlayer p))
+            if (ServerPlayers.TryGetValue(player, out KothPlayer p))
             {
                 p.LeaveTime = DateTime.UtcNow;
                 Debug.WriteLine($"Player {player.Handle} has left the server at {p.LeaveTime}. (Reason: {reason})");
-                players.Remove(player);
+                ServerPlayers.Remove(player);
             }
             else
             {
@@ -67,7 +72,7 @@ namespace koth_server
                 foreach (var p in Players)
                 {
                     Debug.WriteLine($"Adding players to player list after restart.");
-                    players.Add(p, new KothPlayer(p));
+                    ServerPlayers.Add(p, new KothPlayer(p));
                 }
             }
         }
@@ -93,42 +98,39 @@ namespace koth_server
         private void onTeamJoin ( [FromSource] Player player, string team_id )
         {
             var valid_team = int.TryParse(team_id, out int int_teamid);
+
             if (string.IsNullOrEmpty(team_id) || !valid_team || int_teamid < 0 || int_teamid > 3)
             {
                 Debug.WriteLine($"Invalid team: {int_teamid}");
                 return;
             }
 
-            var team = teams.Find((t) => t.team_id == int_teamid);
+            var team = Teams.Find((t) => t.Id == int_teamid);
 
-            if (players[player].JoinTeam(team))
+            if (ServerPlayers[player].JoinTeam(team))
             {
-                var teammates = (from p in team.players
+                var teammates = (from p in team.Players
                                  where p.Base != player
                                  select p.Base.Character.Handle).ToArray();
 
-                var spawn = players[player].CurrentTeam.GetSpawn();
+                var spawn = ServerPlayers[player].CurrentTeam.GetSpawn();
 
-                Debug.WriteLine($"Spawn point: {spawn.player_spawn[0]} {spawn.player_spawn[1]} {spawn.player_spawn[2]}");
+                Debug.WriteLine($"Spawn point: {spawn.PlayerSpawn[0]} {spawn.PlayerSpawn[1]} {spawn.PlayerSpawn[2]}");          
 
-                player.TriggerEvent("koth:playerJoinedTeam",
-                                    spawn.player_spawn,
-                                    players[player].CurrentTeam.team_uniform,
-                                    spawn.weapons_dealer,
-                                    spawn.vehicles_dealer);
+                player.TriggerEvent("koth:playerJoinedTeam", spawn.PlayerSpawn, ServerPlayers[player].CurrentTeam.Uniform, spawn.VehiclesDealerCoords, spawn.WeaponsDealerCoords);
 
-                player.TriggerEvent("chat:addMessage", new { args = new[] { $"You are now part of team {team.team_name}" } });
+                player.TriggerEvent("chat:addMessage", new { args = new[] { $"You are now part of team {team.Name}" } });
 
                 return;
             }
 
-            player.TriggerEvent("chat:addMessage", new { args = new[] { $"Failed to join team {team.team_name}" } });
+            player.TriggerEvent("chat:addMessage", new { args = new[] { $"Failed to join team {team.Name}" } });
         }
 
         [EventHandler("koth:playerFinishSetup")]
         void onPlayerFinishSetup ( [FromSource] Player player )
         {
-            var _player = players[player];
+            var _player = ServerPlayers[player];
             var _handle = _player.Base.Character.Handle;
 
             if (DoesEntityExist(_handle))

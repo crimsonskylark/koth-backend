@@ -2,7 +2,7 @@
 using System.Linq;
 using static CitizenFX.Core.Native.API;
 
-namespace koth_server.User.Classes
+namespace Server.User.Classes
 {
     class Infantry : PlayerClass
     {

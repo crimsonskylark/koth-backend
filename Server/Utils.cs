@@ -1,8 +1,7 @@
 ﻿using CitizenFX.Core;
-using koth_server.Teams;
 using System.Linq;
 
-namespace koth_server
+namespace Server
 {
     public static class Utils
     {

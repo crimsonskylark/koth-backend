@@ -1,10 +1,10 @@
 ﻿using CitizenFX.Core;
-using koth_server.User.Classes;
+using Server.User.Classes;
 using System;
 
 using static CitizenFX.Core.Native.API;
 
-namespace koth_server.User
+namespace Server.User
 {
     /*
      * Represents a player inside the game.
@@ -54,9 +54,9 @@ namespace koth_server.User
             {
                 LeaveTeam();
                 CurrentTeam = t;
-                t.players.Add(this);
-                Debug.WriteLine($"Player {Base.Name} joined team {CurrentTeam.team_name}");
-                TriggerClientEvent(Base, "koth:updateTeamCount", t.team_id, t.players.Count);
+                t.Players.Add(this);
+                Debug.WriteLine($"Player {Base.Name} joined team {CurrentTeam.Name}");
+                TriggerClientEvent(Base, "koth:updateTeamCount", t.Id, t.Players.Count);
                 return true;
             }
             return false;
@@ -64,14 +64,14 @@ namespace koth_server.User
 
         public void LeaveTeam()
         {
-            Debug.WriteLine($"Player {Base.Name} left team {CurrentTeam.team_name}");
-            CurrentTeam.players.Remove(this);
+            Debug.WriteLine($"Player {Base.Name} left team {CurrentTeam.Name}");
+            CurrentTeam.Players.Remove(this);
         }
 
         public void Respawn()
         {
             var where = CurrentTeam.GetPlayerSpawnLocation();
-            TriggerClientEvent("koth:spawnPlayer", where[0], where[1], where[2], where[3], CurrentTeam.team_uniform);
+            TriggerClientEvent("koth:spawnPlayer", where[0], where[1], where[2], where[3], CurrentTeam.Uniform);
         }
 
         public bool SavePlayer()

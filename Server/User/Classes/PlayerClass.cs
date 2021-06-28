@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace koth_server.User
+namespace Server.User
 {
     interface PlayerClass
     {
