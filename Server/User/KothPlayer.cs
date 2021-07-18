@@ -27,54 +27,57 @@ namespace Server.User
         public DateTime LeaveTime { get; set; }
         public float Experience { get; private set; }
         public int Level { get; private set; }
-        public PlayerClass Class;
+        public IPlayerClass Class;
+        public bool CanBeRevived { get; private set; }
 
-        public KothPlayer( Player player )
+        public KothPlayer ( Player player )
         {
             Base = player;
             JoinTime = DateTime.UtcNow;
-            License = Utils.GetPlayerLicense(Base.Identifiers);
-            CurrentTeam = new KothTeam(); // Default team
-            Class = new Infantry();
-            Debug.WriteLine($"Player joined server at {JoinTime}");
+            License = Utils.GetPlayerLicense( Base.Identifiers );
+            Debug.WriteLine( $"Player joined server at {JoinTime}" );
         }
 
-        ~KothPlayer()
+        ~KothPlayer ( )
         {
             LeaveTime = DateTime.UtcNow;
             TotalMoney += SessionMoney;
             TotalKills += SessionKills;
             TotalDeaths += SessionDeaths;
-            Debug.WriteLine($"Player leaving server at {LeaveTime}.");
+            Debug.WriteLine( $"Player leaving server at {LeaveTime}." );
         }
 
-        public bool JoinTeam(KothTeam t)
+        public bool JoinTeam ( KothTeam t )
         {
-            if (t != CurrentTeam)
-            {
-                LeaveTeam();
-                CurrentTeam = t;
-                t.Players.Add(this);
-                Debug.WriteLine($"Player {Base.Name} joined team {CurrentTeam.Name}");
-                TriggerClientEvent(Base, "koth:updateTeamCount", t.Id, t.Players.Count);
-                return true;
-            }
-            return false;
+            Debug.WriteLine( $"t: {t} curr_team: {CurrentTeam}" );
+            if ( CurrentTeam != default )
+                LeaveTeam( );
+
+            CurrentTeam = t;
+            t.Players.Add( this );
+            Debug.WriteLine( $"Player {Base.Name} joined team {CurrentTeam.Name}" );
+            TriggerClientEvent( "koth:updateTeamCount", t.Id, t.Players.Count );
+            return true;
         }
 
-        public void LeaveTeam()
+        public void LeaveTeam ( )
         {
-            Debug.WriteLine($"Player {Base.Name} left team {CurrentTeam.Name}");
-            CurrentTeam.Players.Remove(this);
+            Debug.WriteLine( $"Player {Base.Name} left team {CurrentTeam.Name}" );
+            CurrentTeam.Players.Remove( this );
         }
 
-        public void Respawn()
+        public void Respawn ( )
         {
-            var where = CurrentTeam.GetPlayerSpawnLocation();
-            TriggerClientEvent("koth:spawnPlayer", where[0], where[1], where[2], where[3], CurrentTeam.Uniform);
+            var where = CurrentTeam.GetPlayerSpawnLocation( );
+            TriggerClientEvent( "koth:spawnPlayer",
+                               where[0],
+                               where[1],
+                               where[2],
+                               where[3],
+                               Class.Model );
         }
 
-        public bool SavePlayer()
+        public bool SavePlayer ( )
         {
             /* Save information to the database */
             return true;

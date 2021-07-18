@@ -2,7 +2,7 @@
 
 namespace Server.User
 {
-    interface PlayerClass
+    interface IPlayerClass
     {
         public int ClassId { get; }
         public string ClassName { get; }

@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>\\wsl%24\Ubuntu-20.04\home\oriole\fivem\server\resources\[private]\koth\server\</OutputPath>
+    <OutputPath>..\..\..\..\..\..\fivem\server\server-data\resources\[private]\koth\server\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -36,7 +36,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="CitizenFX.Core.Server, Version=0.0.0.0, Culture=neutral, processorArchitecture=AMD64">
-      <HintPath>..\packages\CitizenFX.Core.Server.1.0.4086\lib\net45\CitizenFX.Core.Server.dll</HintPath>
+      <HintPath>..\packages\CitizenFX.Core.Server.1.0.4184\lib\net45\CitizenFX.Core.Server.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>..\..\..\..\Downloads\Newtonsoft.Json.dll</HintPath>
@@ -51,6 +51,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Config.cs" />
+    <Compile Include="Map\Map.cs" />
+    <Compile Include="Map\MapContainer.cs" />
+    <Compile Include="Map\TeamZone.cs" />
     <Compile Include="User\Classes\Infantry.cs" />
     <Compile Include="User\Classes\PlayerClass.cs" />
     <Compile Include="Teams\CommandPost.cs" />
@@ -63,13 +67,13 @@
     <Compile Include="Utils.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Shared\Koth.Shared.csproj">
       <Project>{a5b3bcaf-1b74-43e2-9263-ad12ed9b353f}</Project>
       <Name>Koth.Shared</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

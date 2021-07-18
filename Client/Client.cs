@@ -1,9 +1,7 @@
 ﻿using CitizenFX.Core;
 using Newtonsoft.Json;
-using Shared;
 using System;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -15,14 +13,15 @@ namespace Client
     {
         private bool MenuOpen = true;
         private bool TeamSelectionOpen = false;
+        private bool ClassSelectionOpen = false;
 
         private bool CreatedWeaponsDealerNPC = false;
         private bool CreatedVehiclesDealerNPC = false;
 
-        private readonly uint WeaponsDealerModel = (uint)GetHashKey("s_m_m_marine_02");
+        private readonly uint WeaponsDealerModel = (uint)GetHashKey( "s_m_m_marine_02" );
 
-        private readonly uint VehiclesDealerModel = (uint)GetHashKey("s_m_y_marine_01");
-        private readonly uint VehiclesDealerPropModel = (uint)GetHashKey("insurgent2");
+        private readonly uint VehiclesDealerModel = (uint)GetHashKey( "s_m_y_marine_01" );
+        private readonly uint VehiclesDealerPropModel = (uint)GetHashKey( "insurgent2" );
 
         private List<float> WeaponsDealerCoords;
         private List<float> VehiclesDealerCoords;
@@ -31,110 +30,129 @@ namespace Client
 
         public Client ( )
         {
-            Debug.WriteLine("Starting up KOTH...");
+            Debug.WriteLine( "Starting up KOTH..." );
 
-            RegisterNuiCallbackType("toggleMenuVisibility");
-            RegisterNuiCallbackType("toggleTeamSelection");
-            RegisterNuiCallbackType("teamSelection");
+            RegisterNuiCallbackType( "toggleMenuVisibility" );
+            RegisterNuiCallbackType( "toggleTeamSelection" );
+            RegisterNuiCallbackType( "toggleClassSelection" );
+
+            RegisterNuiCallbackType( "teamSelection" );
+            RegisterNuiCallbackType( "classSelection" );
         }
+
+#if DEBUG
+
+        #region Debug
+
+        private void PrintHealth ( )
+        {
+            Debug.WriteLine( $"Entity health: {Game.PlayerPed.Health}" );
+            Debug.WriteLine( $"Entity max health: {Game.PlayerPed.MaxHealth}" );
+        }
+
+        #endregion Debug
+
+#endif
 
         #region GameEvents
 
-        [EventHandler("onClientMapStart")]
-        void onClientMapStart ( string _ )
+        [EventHandler( "onClientMapStart" )]
+        void OnClientMapStart ( string _ )
         {
-            Exports["spawnmanager"].setAutoSpawn(false);
+            Exports["spawnmanager"].setAutoSpawn( false );
 
-            if (BusyspinnerIsOn())
-                BusyspinnerOff();
+            if ( BusyspinnerIsOn( ) )
+                BusyspinnerOff( );
 
-            RequestModel(WeaponsDealerModel);
-            RequestModel(VehiclesDealerModel);
-            RequestModel(VehiclesDealerPropModel);
+            RequestModel( WeaponsDealerModel );
+            RequestModel( VehiclesDealerModel );
+            RequestModel( VehiclesDealerPropModel );
         }
 
-        [EventHandler("onClientResourceStart")]
-        void onClientResourceStart ( string name )
+        [EventHandler( "onClientResourceStart" )]
+        void OnClientResourceStart ( string name )
         {
-            if (name.Equals(GetCurrentResourceName()))
+            if ( name.Equals( GetCurrentResourceName( ) ) )
             {
-                Debug.WriteLine("Bem-vindo ao servidor de King of the Hill do Faded!");
-                SetNuiFocus(MenuOpen, MenuOpen);
+                Debug.WriteLine( "Bem-vindo ao servidor de King of the Hill do Faded!" );
+                SetNuiFocus( MenuOpen, MenuOpen );
             }
         }
 
-        [EventHandler("playerSpawned")]
-        async void onPlayerSpawned ( object _ )
+        [EventHandler( "playerSpawned" )]
+        async void OnPlayerSpawned ( object _ )
         {
-            if (!CreatedWeaponsDealerNPC)
+            if ( !CreatedWeaponsDealerNPC )
             {
-                while (!HasModelLoaded(WeaponsDealerModel))
+                while ( !HasModelLoaded( WeaponsDealerModel ) )
                 {
-                    await Delay(250);
+                    await Delay( 250 );
                 }
 
                 /* Default to pre-defined value if unable to get ground zero */
                 float groundZero = WeaponsDealerCoords[2];
 
-                GetGroundZFor_3dCoord(WeaponsDealerCoords[0], WeaponsDealerCoords[1], WeaponsDealerCoords[2], ref groundZero, false);
+                GetGroundZFor_3dCoord( WeaponsDealerCoords[0], WeaponsDealerCoords[1], WeaponsDealerCoords[2], ref groundZero, false );
 
-                Debug.WriteLine($"Weapon dealer position: {WeaponsDealerCoords[0]}, {WeaponsDealerCoords[1]}, {WeaponsDealerCoords[2]}, {WeaponsDealerCoords[3]}");
-                var weaponsDealerHandle = CreatePed(0, WeaponsDealerModel, WeaponsDealerCoords[0], WeaponsDealerCoords[1], groundZero, WeaponsDealerCoords[3], false, true);
+                Debug.WriteLine( $"Weapon dealer position: {WeaponsDealerCoords[0]}, {WeaponsDealerCoords[1]}, {WeaponsDealerCoords[2]}, {WeaponsDealerCoords[3]}" );
+                var weaponsDealerHandle = CreatePed( 0, WeaponsDealerModel, WeaponsDealerCoords[0], WeaponsDealerCoords[1], groundZero, WeaponsDealerCoords[3], false, true );
 
-                if (weaponsDealerHandle != 0)
+                if ( weaponsDealerHandle != 0 )
                 {
-                    EntitySetAttr(weaponsDealerHandle);
+                    EntitySetAttr( weaponsDealerHandle );
                     CreatedWeaponsDealerNPC = true;
                 }
                 else
                 {
-                    Debug.WriteLine($"Failed to create weapons dealer ped. Please report this error!");
+                    Debug.WriteLine( $"Failed to create weapons dealer ped. Please report this error!" );
                 }
             }
 
-            if (!CreatedVehiclesDealerNPC)
+            if ( !CreatedVehiclesDealerNPC )
             {
-                while (!HasModelLoaded(VehiclesDealerModel) || !HasModelLoaded(VehiclesDealerPropModel))
+                while ( !HasModelLoaded( VehiclesDealerModel ) || !HasModelLoaded( VehiclesDealerPropModel ) )
                 {
-                    await Delay(250);
+                    await Delay( 250 );
                 }
 
                 float groundZero = VehiclesDealerCoords[2];
-                GetGroundZFor_3dCoord(VehiclesDealerCoords[0], VehiclesDealerCoords[1], VehiclesDealerCoords[2], ref groundZero, false);
+                GetGroundZFor_3dCoord( VehiclesDealerCoords[0], VehiclesDealerCoords[1], VehiclesDealerCoords[2], ref groundZero, false );
 
-                Debug.WriteLine($"Vehicle dealer position: {VehiclesDealerCoords[0]}, {VehiclesDealerCoords[1]}, {VehiclesDealerCoords[2]}, {VehiclesDealerCoords[3]}");
+#if DEBUG
+                Debug.WriteLine( $"Vehicle dealer position: {VehiclesDealerCoords[0]}, {VehiclesDealerCoords[1]}, {VehiclesDealerCoords[2]}, {VehiclesDealerCoords[3]}" );
+#endif
 
-                var vehicleDealerHandle = CreatePed(0, VehiclesDealerModel, VehiclesDealerCoords[0], VehiclesDealerCoords[1], groundZero, VehiclesDealerCoords[3], false, true);
+                var vehicleDealerHandle = CreatePed( 0, VehiclesDealerModel, VehiclesDealerCoords[0], VehiclesDealerCoords[1], groundZero, VehiclesDealerCoords[3], false, true );
 
-                var vehiclesDealerPropHandle = CreateVehicle(VehiclesDealerPropModel,
+                var vehiclesDealerPropHandle = CreateVehicle( VehiclesDealerPropModel,
                                                    VehiclesDealerCoords[0] + 1.7f,
                                                    VehiclesDealerCoords[1] + .5f,
                                                    VehiclesDealerCoords[2],
                                                    VehiclesDealerCoords[3] * 1.8f,
                                                    false,
-                                                   true);
+                                                   true );
 
-                SetVehicleDoorsLockedForAllPlayers(vehiclesDealerPropHandle, true);
-
-                if (vehicleDealerHandle != 0)
+                SetVehicleDoorsLockedForAllPlayers( vehiclesDealerPropHandle, true );
+                SetVehicleDoorsLocked( vehiclesDealerPropHandle, 2 );
+                if ( vehicleDealerHandle != 0 )
                 {
-                    EntitySetAttr(vehicleDealerHandle);
-                    EntitySetAttr(vehiclesDealerPropHandle);
+                    EntitySetAttr( vehicleDealerHandle );
+                    EntitySetAttr( vehiclesDealerPropHandle );
                     CreatedVehiclesDealerNPC = true;
                 }
                 else
                 {
-                    Debug.WriteLine($"Failed to create vehicle dealer ped. Please report this error!");
+                    Debug.WriteLine( $"Failed to create vehicle dealer ped. Please report this error!" );
                 }
 
             }
 
             Game.PlayerPed.DropsWeaponsOnDeath = false;
-            TriggerServerEvent("koth:playerFinishSetup");
+            TriggerServerEvent( "koth:playerFinishSetup" );
 
-            SetModelAsNoLongerNeeded(VehiclesDealerPropModel);
-            SetModelAsNoLongerNeeded(VehiclesDealerModel);
-            SetModelAsNoLongerNeeded(WeaponsDealerModel);
+            SetModelAsNoLongerNeeded( VehiclesDealerPropModel );
+            SetModelAsNoLongerNeeded( VehiclesDealerModel );
+            SetModelAsNoLongerNeeded( WeaponsDealerModel );
         }
 
         #endregion GameEvents
@@ -142,43 +160,74 @@ namespace Client
 
         #region NUICallbacks
 
-        [EventHandler("__cfx_nui:toggleTeamSelection")]
-        void onToggleTeamSelection ( IDictionary<string, object> data, CallbackDelegate cb )
+        [EventHandler( "__cfx_nui:toggleTeamSelection" )]
+        void OnToggleTeamSelection ( IDictionary<string, object> data, CallbackDelegate cb )
         {
             TeamSelectionOpen = !TeamSelectionOpen;
-            cb(new
+            cb( new
             {
                 ok = true
-            });
+            } );
         }
 
-        [EventHandler("__cfx_nui:toggleMenu")]
-        void onToggleMenu ( IDictionary<string, object> data, CallbackDelegate cb )
+        [EventHandler( "__cfx_nui:toggleMenu" )]
+        void OnToggleMenu ( IDictionary<string, object> data, CallbackDelegate cb )
         {
             MenuOpen = !MenuOpen;
-            cb(new
+            cb( new
             {
                 ok = true
-            });
+            } );
         }
 
-        [EventHandler("__cfx_nui:teamSelection")]
-        void onSelectTeam ( IDictionary<string, object> data, CallbackDelegate cb )
+        [EventHandler( "__cfx_nui:toggleClassSelection" )]
+        void OnToggleClassSelection ( IDictionary<string, object> data, CallbackDelegate cb )
         {
-            if (!data.TryGetValue("team_id", out var teamIdObj))
+            ClassSelectionOpen = !ClassSelectionOpen;
+            cb( new
             {
-                cb(new { error = "invalid team", ok = false });
+                ok = true
+            } );
+        }
+
+        [EventHandler( "__cfx_nui:teamSelection" )]
+        void OnSelectTeam ( IDictionary<string, object> data, CallbackDelegate cb )
+        {
+            if ( !data.TryGetValue( "team_id", out var teamIdObj ) )
+            {
+                cb( new { error = "Invalid team!", ok = false } );
                 return;
             }
 
-            var team_id = (teamIdObj as string) ?? "";
+            var team_id = ( teamIdObj as string ) ?? "";
 
-            TriggerServerEvent("koth:teamJoin", team_id);
+            TriggerServerEvent( "koth:teamJoin", team_id );
 
-            cb(new
+            cb( new
             {
                 ok = true,
-            });
+            } );
+        }
+
+        [EventHandler( "__cfx_nui:classSelection" )]
+        void OnClassSelection ( IDictionary<string, object> data, CallbackDelegate cb )
+        {
+            if ( !data.TryGetValue( "class_id", out var classIdObj ) )
+            {
+                cb( new { error = "Invalid class!", ok = false } );
+                return;
+            }
+
+            var class_id = ( classIdObj as string ) ?? "";
+
+            Debug.WriteLine( $"Selecting class: {class_id}" );
+
+            TriggerServerEvent( "koth:classSelected", class_id );
+
+            cb( new
+            {
+                ok = true,
+            } );
         }
 
         #endregion NUICallbacks
@@ -189,47 +238,65 @@ namespace Client
         [Tick]
         async Task RevivePlayer ( )
         {
-            Game.DisableControlThisFrame(0, Control.ReplayStartStopRecordingSecondary);
-            if (Game.PlayerPed.IsDead && IsDisabledControlPressed(0, (int)Control.ReplayStartStopRecordingSecondary))
+            Game.DisableControlThisFrame( 0, Control.ReplayStartStopRecordingSecondary );
+            if ( Game.PlayerPed.IsDead && IsDisabledControlPressed( 0, (int)Control.ReplayStartStopRecordingSecondary ) )
             {
-                NetworkResurrectLocalPlayer(Game.PlayerPed.Position.X, Game.PlayerPed.Position.Y, Game.PlayerPed.Position.Z, Game.PlayerPed.Heading, false, false);
+                NetworkResurrectLocalPlayer( Game.PlayerPed.Position.X, Game.PlayerPed.Position.Y, Game.PlayerPed.Position.Z, Game.PlayerPed.Heading, false, false );
                 Game.PlayerPed.IsInvincible = false;
-                Game.PlayerPed.ClearBloodDamage();
+                Game.PlayerPed.ClearBloodDamage( );
             }
-            await Delay(100);
+            await Delay( 100 );
+        }
+
+        [Tick]
+        async Task GetStateUpdate ( )
+        {
+            if ( !Game.PlayerPed.IsDead )
+            {
+                SendNuiMessage( JsonConvert.SerializeObject( new { type = "health_update", health = Game.PlayerPed.Health, max_health = Game.PlayerPed.MaxHealth } ) );
+            }
+
+            await Delay( 100 );
         }
 
         #endregion TickRoutines
 
         #region GameModeEvents
 
-        [EventHandler("koth:playerJoinedTeam")]
-        void onPlayerJoinedTeam ( List<object> spawnCoords, int spawnModel, List<object> vehiclesDealerCoords, List<object> weaponsDealerCoords )
+        [EventHandler( "koth:playerJoinedTeam" )]
+        void OnPlayerJoinedTeam ( )
         {
-
-            SendNuiMessage(JsonConvert.SerializeObject(new { type = "menu_toggle" }));
-            MenuOpen = !MenuOpen;
-            SetNuiFocus(MenuOpen, MenuOpen);
-
-            /* used in "playerSpawned" */
-            WeaponsDealerCoords = weaponsDealerCoords.OfType<float>().ToList();
-            VehiclesDealerCoords = vehiclesDealerCoords.OfType<float>().ToList();
-
-            var playerSpawnCoords = spawnCoords.OfType<float>().ToList();
-
-            /* just reuse it in the future */
-            SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], model = spawnModel, skipFade = false });
-
-            Debug.WriteLine($"Spawning at {playerSpawnCoords[0]}, {playerSpawnCoords[1]}, {playerSpawnCoords[2]} with heading { playerSpawnCoords[3] } and model {spawnModel}.");
-
-            Exports["spawnmanager"].spawnPlayer(SessionSpawnPoint);
+            SendNuiMessage( JsonConvert.SerializeObject( new { type = "team_selection_toggle" } ) );
+            SendNuiMessage( JsonConvert.SerializeObject( new { type = "class_selection_toggle" } ) );
         }
 
-        [EventHandler("koth:spawnPlayer")]
+        [EventHandler( "koth:spawnPlayer" )]
         void SpawnPlayer ( float x, float y, float z, float heading, int model )
         {
-            Debug.WriteLine($"Received spawn command: {x}, {y}, {z}, {heading}, {model}");
-            Exports["spawnmanager"].spawnPlayer(new { x, y, z, heading, model, skipFade = false });
+            Exports["spawnmanager"].spawnPlayer( new { x, y, z, heading, model, skipFade = false } );
+        }
+
+        [EventHandler( "koth:playerSelectedClass" )]
+        void OnPlayerSelectClass ( List<object> spawnCoords, List<object> vehiclesDealerCoords, List<object> weaponsDealerCoords, int spawnModel )
+        {
+            if ( !CreatedWeaponsDealerNPC && !CreatedVehiclesDealerNPC )
+            {
+                WeaponsDealerCoords = weaponsDealerCoords.OfType<float>( ).ToList( );
+                VehiclesDealerCoords = vehiclesDealerCoords.OfType<float>( ).ToList( );
+            }
+
+            ClassSelectionOpen = !ClassSelectionOpen;
+            SetNuiFocus( ClassSelectionOpen, ClassSelectionOpen );
+
+            /* used in "playerSpawned" */
+            var playerSpawnCoords = spawnCoords.OfType<float>( ).ToList( );
+
+            /* just reuse it in the future */
+            SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint( new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], model = spawnModel, skipFade = false } );
+
+            Exports["spawnmanager"].spawnPlayer( SessionSpawnPoint );
+
+            SendNuiMessage( JsonConvert.SerializeObject( new { type = "finish_setup" } ) );
         }
 
         #endregion GameModeEvents
@@ -238,10 +305,10 @@ namespace Client
 
         void EntitySetAttr ( int entity )
         {
-            SetEntityAsMissionEntity(entity, true, true);
-            SetEntityInvincible(entity, true);
-            FreezeEntityPosition(entity, true);
-            SetBlockingOfNonTemporaryEvents(entity, true);
+            SetEntityAsMissionEntity( entity, true, true );
+            SetEntityInvincible( entity, true );
+            FreezeEntityPosition( entity, true );
+            SetBlockingOfNonTemporaryEvents( entity, true );
         }
 
         #endregion GameModeFunctions
