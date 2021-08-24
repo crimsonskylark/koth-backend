@@ -21,7 +21,7 @@ namespace Server.User
         public int SessionKills { get; private set; }
         public int SessionDeaths { get; private set; }
         public int SessionMoney { get; private set; }
-        public KothTeam CurrentTeam { get; private set; }
+        public KothTeam CurrentTeam { get; private set; } = default;
         //public Squad curr_squad { get; private set; }
         public DateTime JoinTime { get; private set; }
         public DateTime LeaveTime { get; set; }
@@ -54,7 +54,9 @@ namespace Server.User
                 LeaveTeam( );
 
             CurrentTeam = t;
+            Debug.WriteLine($"Current team passed");
             t.Players.Add( this );
+            Debug.WriteLine($"Add passed");
             Debug.WriteLine( $"Player {Base.Name} joined team {CurrentTeam.Name}" );
             TriggerClientEvent( "koth:updateTeamCount", t.Id, t.Players.Count );
             return true;

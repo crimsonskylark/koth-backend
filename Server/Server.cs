@@ -1,8 +1,8 @@
 ﻿using CitizenFX.Core;
 using koth_server.Map;
 using Newtonsoft.Json;
-using Server.Teams;
 using Server.User;
+using Server.User.Classes;
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
@@ -25,66 +25,83 @@ namespace Server
         HillLost,
         HillContested
     }
+
+    enum Job : int
+    {
+        Infantry = 1,
+        Medic
+    }
     class Server : BaseScript
     {
-        readonly Dictionary<Player, KothPlayer> ServerPlayers = new( );
-        readonly List<KothTeam> Teams = new( );
-        readonly MapContainer MapConfig = new( );
+        readonly Dictionary<Player, KothPlayer> ServerPlayers = new();
+        readonly List<KothTeam> Teams = new();
+        readonly MapContainer MapConfig = new();
 
         public Server ( )
         {
-            Debug.WriteLine( "server main started!" );
-            Debug.WriteLine( "setting up stuff" );
+            Debug.WriteLine("server main started!");
+            Debug.WriteLine("setting up stuff");
 
             // All teams
-            var config = LoadResourceFile( GetCurrentResourceName( ), "config/maps.json" );
-            
-            MapConfig = JsonConvert.DeserializeObject<MapContainer>( config );
-            
-            var r = new Random( ).Next(0, MapConfig.Maps.Count()-1);
+            var config = LoadResourceFile(GetCurrentResourceName(), "config/maps.json");
+
+            MapConfig = JsonConvert.DeserializeObject<MapContainer>(config);
+
+            var r = new Random().Next(0, MapConfig.Maps.Count() - 1);
             var session = MapConfig.Maps[r];
+
+            int team_id = 0;
 
             foreach (var t in session.Teams)
             {
-                Debug.WriteLine( t.SafeZone[0].ToString( ) );
+                Teams.Add(new KothTeam(team_id, t.Name, t, t.InfantryModel));
+                team_id += 1;
             }
 
         }
 
         #region GameEvents
-        [EventHandler( "playerJoining" )]
-        void OnPlayerJoining ( [FromSource] Player player, string old_id )
+        [EventHandler("playerJoining")]
+        void OnPlayerJoining ( [FromSource] Player player, string _ )
         {
-            Debug.WriteLine( $"Player {player.Handle} has joined the server." );
-            ServerPlayers.Add( player, new KothPlayer( player ) );
+            Debug.WriteLine($"Player {player.Handle} has joined the server.");
+            ServerPlayers[player] = new KothPlayer(player);
         }
 
-        [EventHandler( "playerDropped" )]
+        [EventHandler("playerDropped")]
         void OnPlayerDropped ( [FromSource] Player player, string reason )
         {
-            if ( ServerPlayers.TryGetValue( player, out KothPlayer p ) )
+            if (ServerPlayers.TryGetValue(player, out KothPlayer p))
             {
                 p.LeaveTime = DateTime.UtcNow;
-                Debug.WriteLine( $"Player {player.Handle} has left the server at {p.LeaveTime}. (Reason: {reason})" );
-                ServerPlayers.Remove( player );
+                Debug.WriteLine($"Player {player.Handle} has left the server at {p.LeaveTime}. (Reason: {reason})");
+                if (ServerPlayers.Remove(player))
+                {
+                    Debug.WriteLine($"Removed player {player.Handle} from player list.");
+                }
+                else
+                {
+                    Debug.WriteLine($"Failed to remove {player.Handle} from player list.");
+                }
                 /* TODO: Save player information in database */
             }
             else
             {
                 /* Should never be reached in production. */
-                Debug.WriteLine( $"[!!!] Player not found." );
+                Debug.WriteLine($"[!!!] Player not found.");
             }
         }
 
-        [EventHandler( "onResourceStart" )]
+        [EventHandler("onResourceStart")]
         void OnResourceStart ( string name )
         {
-            if ( GetCurrentResourceName( ).Equals( name ) )
+            Debug.WriteLine($"onResourceStart");
+            if (GetCurrentResourceName().Equals(name))
             {
-                foreach ( var p in Players )
+                foreach (var p in Players)
                 {
-                    Debug.WriteLine( $"Adding players to player list after restart." );
-                    ServerPlayers.Add( p, new KothPlayer( p ) );
+                    Debug.WriteLine($"Adding players to player list after restart.");
+                    ServerPlayers.Add(p, new KothPlayer(p));
                 }
             }
         }
@@ -92,13 +109,13 @@ namespace Server
 
         #region BaseEvents
 
-        [EventHandler( "baseevents:onPlayerKilled" )]
+        [EventHandler("baseevents:onPlayerKilled")]
         private void OnPlayerKilled ( [FromSource] Player player, int killerType, ExpandoObject obj )
         {
-            Debug.WriteLine( "Player killed" );
-            foreach ( var v in obj )
+            Debug.WriteLine("Player killed");
+            foreach (var v in obj)
             {
-                Debug.WriteLine( $"Key: {v.Key} value: {v.Value}" );
+                Debug.WriteLine($"Key: {v.Key} value: {v.Value}");
             }
         }
 
@@ -106,73 +123,48 @@ namespace Server
 
         #region KOTHEvents
 
-        [EventHandler( "koth:teamJoin" )]
+        [EventHandler("koth:teamJoin")]
         private void OnTeamJoin ( [FromSource] Player player, string team_id )
         {
-            Debug.WriteLine( "onTeamJoinServerEvent" );
-            var valid_team = int.TryParse( team_id, out int IntTeamId );
-            Debug.WriteLine( $"Valid team: {valid_team}" );
-            if ( string.IsNullOrEmpty( team_id ) || !valid_team || IntTeamId < 0 || IntTeamId > 3 )
+            var valid_team = int.TryParse(team_id, out int IntTeamId);
+
+            if (string.IsNullOrEmpty(team_id) || !valid_team || IntTeamId < 0 || IntTeamId > 3)
             {
-                Debug.WriteLine( $"Invalid team: {IntTeamId}" );
+                Debug.WriteLine($"Invalid team: {IntTeamId}");
                 return;
             }
 
-            var team = Teams.Find( ( t ) => t.Id == IntTeamId );
+            var team = Teams.Find((t) => t.Id == IntTeamId-1);
 
-            Debug.WriteLine( $"Player team: {team}" );
-
-            if ( ServerPlayers[player].JoinTeam( team ) )
+            if (ServerPlayers.TryGetValue(player, out KothPlayer _p))
             {
-                var teammates = ( from p in team.Players
-                                  where p.Base != player
-                                  select NetworkGetEntityOwner( p.Base.Character.Handle ) ).ToArray( );
+                _p.JoinTeam(team);
+                var teammates = (from p in team.Players
+                                 where p.Base != player
+                                 select NetworkGetEntityOwner(p.Base.Character.Handle)).ToArray();
 
-                Debug.WriteLine( $"Joining team with teammates {teammates}" );
+                var spawn = _p.CurrentTeam.Zone;
 
-                player.TriggerEvent( "koth:playerJoinedTeam", teammates );
-
-                player.TriggerEvent( "chat:addMessage", new { args = new[] { $"You are now part of team {team.Name}" } } );
+                player.TriggerEvent("koth:playerJoinedTeam", teammates, spawn.PlayerSpawnCoords, spawn.VehDealerCoords, spawn.VehDealerPropCoords, _p.Class.Model);
+                player.TriggerEvent("chat:addMessage", new { args = new[] { $"You are now part of team {team.Name}" } });
 
                 return;
             }
 
-            player.TriggerEvent( "chat:addMessage", new { args = new[] { $"Failed to join team {team.Name}" } } );
+            player.TriggerEvent("chat:addMessage", new { args = new[] { $"Failed to join team {team.Name}" } });
         }
 
-        [EventHandler( "koth:classSelected" )]
-        private void OnClassSelected ( [FromSource] Player player, string class_id )
-        {
-            Debug.WriteLine( "OnClassSelected" );
-            var valid_class = int.TryParse( class_id, out int IntClassId );
-            if ( string.IsNullOrEmpty( class_id ) || !valid_class || IntClassId < 0 || IntClassId > 3 )
-            {
-                Debug.WriteLine( $"Invalid class: {IntClassId}" );
-                return;
-            }
-
-            var p = ServerPlayers[player];
-            p.Class = p.CurrentTeam.PlayerClasses[IntClassId];
-
-            var spawn = ServerPlayers[player].CurrentTeam.GetSpawn( );
-
-            player.TriggerEvent( "koth:playerSelectedClass", spawn.PlayerSpawn, spawn.VehiclesDealerCoords, spawn.WeaponsDealerCoords, p.Class.Model );
-        }
-
-        [EventHandler( "koth:playerFinishSetup" )]
+        [EventHandler("koth:playerFinishSetup")]
         void OnPlayerFinishSetup ( [FromSource] Player player )
         {
-            var _player = ServerPlayers[player];
-            var _handle = _player.Base.Character.Handle;
-
-            if ( DoesEntityExist( _handle ) && IsPedAPlayer( _handle ) )
+            if (DoesEntityExist(player.Character.Handle) && IsPedAPlayer(player.Character.Handle))
             {
-                GiveWeaponToPed( _handle,
-                                _player.Class.DefaultWeapon,
-                                200,
+                GiveWeaponToPed(player.Character.Handle,
+                                ServerPlayers[player].Class.DefaultWeapon,
+                                300,
                                 false,
-                                true );
-                SetPedArmour( _handle, 100 );
+                                true);
+                SetPedArmour(player.Character.Handle, 100);
             }
         }
 
