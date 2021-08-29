@@ -14,7 +14,6 @@ namespace Client
     {
         private bool MenuOpen = true;
         private bool TeamSelectionOpen = false;
-        private bool ClassSelectionOpen = false;
 
         private bool CreatedVehiclesDealerNPC = false;
 
@@ -23,6 +22,7 @@ namespace Client
 
         private List<float> VehiclesDealerCoords;
         private List<float> VehiclesDealerPropCoords;
+        private List<float> AO;
 
         private dynamic SessionSpawnPoint;
 
@@ -38,20 +38,6 @@ namespace Client
             RegisterNuiCallbackType("classSelection");
         }
 
-#if DEBUG
-
-        #region Debug
-
-        private void PrintHealth ( )
-        {
-            Debug.WriteLine($"Entity health: {Game.PlayerPed.Health}");
-            Debug.WriteLine($"Entity max health: {Game.PlayerPed.MaxHealth}");
-        }
-
-        #endregion Debug
-
-#endif
-
         #region GameEvents
 
         [EventHandler("onClientMapStart")]
@@ -62,8 +48,6 @@ namespace Client
             if (BusyspinnerIsOn())
                 BusyspinnerOff();
 
-            RequestModel(VehiclesDealerModel);
-            RequestModel(VehiclesDealerPropModel);
         }
 
         [EventHandler("onClientResourceStart")]
@@ -93,13 +77,12 @@ namespace Client
                 float groundZero = VehiclesDealerCoords[2];
                 GetGroundZFor_3dCoord(VehiclesDealerCoords[0], VehiclesDealerCoords[1], VehiclesDealerCoords[2], ref groundZero, false);
 
-                RequestCollisionAtCoord(VehiclesDealerCoords[0], VehiclesDealerCoords[1], groundZero);
-
                 var vehicleDealerHandle = CreatePed( 0, VehiclesDealerModel, VehiclesDealerCoords[0], VehiclesDealerCoords[1], groundZero, VehiclesDealerCoords[3], false, true );
 
-                Function.Call((Hash)0x283978A15512B2FE, vehicleDealerHandle, true);
+                Function.Call((Hash)0x283978A15512B2FE, vehicleDealerHandle, false);
 
-                SetPedComponentVariation(vehicleDealerHandle, 0, 0, 1, 0);
+                SetPedComponentVariation(vehicleDealerHandle, 1, 0, 1, 0);
+                SetPedComponentVariation(vehicleDealerHandle, 0, 0, 0, 0);
 
                 var vehiclesDealerPropHandle = CreateVehicle( VehiclesDealerPropModel,
                                                    VehiclesDealerPropCoords[0],
@@ -207,7 +190,7 @@ namespace Client
         #region GameModeEvents
 
         [EventHandler("koth:playerJoinedTeam")]
-        void OnPlayerJoinedTeam ( List<object> playerTeammates, List<object> spawnCoords, List<object> vehiclesDealerCoords, List<object> vehDealerPropCoords )
+        void OnPlayerJoinedTeam ( List<object> playerTeammates, List<object> spawnCoords, List<object> vehiclesDealerCoords, List<object> vehDealerPropCoords, List<object> combatZone, uint playerModel )
         {
             SendNuiMessage(JsonConvert.SerializeObject(new { type = "team_selection_toggle" }));
 
@@ -233,12 +216,17 @@ namespace Client
             }
 
             /* just reuse it in the future */
-            SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], skipFade = false });
+            SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], model = playerModel, skipFade = false });
 
             Exports["spawnmanager"].spawnPlayer(SessionSpawnPoint);
 
+            AO = combatZone.OfType<float>().ToList();
+
+            Exports["polyzone"].setupGameZones(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], h = playerSpawnCoords[3] }, new { x = AO[0], y = AO[1], z = AO[2] });
+
             SendNuiMessage(JsonConvert.SerializeObject(new { type = "finish_setup" }));
 
+            SetNuiFocus(false, false);
         }
 
         [EventHandler("koth:spawnPlayer")]
