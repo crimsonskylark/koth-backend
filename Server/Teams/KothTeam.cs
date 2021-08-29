@@ -4,11 +4,9 @@ using Server.User;
 using System;
 using System.Collections.Generic;
 
-using static CitizenFX.Core.Native.API;
-
 namespace Server
 {
-    internal class KothTeam : IEquatable<KothTeam>
+    internal class KothTeam
     {
         public int Id { get; }
         public string Name { get; }
@@ -18,15 +16,13 @@ namespace Server
         public TeamZone Zone;
         public List<KothPlayer> Players = new();
 
-        public uint InfantryUniform { get; set; } = 0;
-        public uint MedicUniform { get; set; } = 0;
         public KothTeam()
         {
-            Id = 0;
+            Id = -1;
             Name = "";
         }
 
-        public KothTeam(int _team_id, string _team_name, TeamZone _zone, string _infantry_uniform)
+        public KothTeam(int _team_id, string _team_name, TeamZone _zone)
         {
             Id = _team_id;
             Name = _team_name;
@@ -34,7 +30,6 @@ namespace Server
             Points = 0;
             Full = false;
             Zone = _zone;
-            InfantryUniform = (uint)GetHashKey(_infantry_uniform);
         }
 
         public void AddFlagPoint()
@@ -49,22 +44,6 @@ namespace Server
             Points += 1;
         }
 
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as KothTeam);
-        }
-
-        public bool Equals(KothTeam other)
-        {
-            return other != null &&
-                   Id == other.Id;
-        }
-
-        public override int GetHashCode()
-        {
-            return 591577740 + Id.GetHashCode();
-        }
-
         public Spawn GetSpawn()
         {
             return new Spawn();
@@ -74,8 +53,5 @@ namespace Server
         {
             return GetSpawn().PlayerSpawn;
         }
-
-        public static bool operator ==(KothTeam first, KothTeam second) => first is object && second is object && first.Id == second.Id;
-        public static bool operator !=(KothTeam first, KothTeam second) => first is object && second is object && first.Id != second.Id;
     }
 }
