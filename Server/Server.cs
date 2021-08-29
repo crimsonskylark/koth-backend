@@ -26,38 +26,33 @@ namespace Server
         HillContested
     }
 
-    enum Job : int
-    {
-        Infantry = 1,
-        Medic
-    }
     class Server : BaseScript
     {
         readonly Dictionary<Player, KothPlayer> ServerPlayers = new();
         readonly List<KothTeam> Teams = new();
-        readonly MapContainer MapConfig = new();
-
+        readonly Map SessionMap = new();
+        readonly uint DefaultWeapon = (uint)GetHashKey("weapon_compactrifle");
+        readonly uint DefaultPed = (uint)GetHashKey("mp_m_freemode_01");
         public Server ( )
         {
             Debug.WriteLine("server main started!");
             Debug.WriteLine("setting up stuff");
 
             // All teams
-            var config = LoadResourceFile(GetCurrentResourceName(), "config/maps.json");
+            var config = LoadResourceFile(GetCurrentResourceName(), "config/gamemode.json");
 
-            MapConfig = JsonConvert.DeserializeObject<MapContainer>(config);
+            var map_config = JsonConvert.DeserializeObject<MapContainer>(config);
 
-            var r = new Random().Next(0, MapConfig.Maps.Count() - 1);
-            var session = MapConfig.Maps[r];
+            var r = new Random().Next(0, map_config.Maps.Count() - 1);
+            SessionMap = map_config.Maps[r];
 
             int team_id = 0;
 
-            foreach (var t in session.Teams)
+            foreach (var t in SessionMap.Teams)
             {
-                Teams.Add(new KothTeam(team_id, t.Name, t, t.InfantryModel));
+                Teams.Add(new KothTeam(team_id, t.Name, t));
                 team_id += 1;
             }
-
         }
 
         #region GameEvents
@@ -74,7 +69,11 @@ namespace Server
             if (ServerPlayers.TryGetValue(player, out KothPlayer p))
             {
                 p.LeaveTime = DateTime.UtcNow;
+
                 Debug.WriteLine($"Player {player.Handle} has left the server at {p.LeaveTime}. (Reason: {reason})");
+
+                p.LeaveTeam();
+
                 if (ServerPlayers.Remove(player))
                 {
                     Debug.WriteLine($"Removed player {player.Handle} from player list.");
@@ -95,7 +94,6 @@ namespace Server
         [EventHandler("onResourceStart")]
         void OnResourceStart ( string name )
         {
-            Debug.WriteLine($"onResourceStart");
             if (GetCurrentResourceName().Equals(name))
             {
                 foreach (var p in Players)
@@ -136,36 +134,84 @@ namespace Server
 
             var team = Teams.Find((t) => t.Id == IntTeamId-1);
 
-            if (ServerPlayers.TryGetValue(player, out KothPlayer _p))
+            if (ServerPlayers.TryGetValue(player, out KothPlayer _p) && _p.JoinTeam(team))
             {
-                _p.JoinTeam(team);
                 var teammates = (from p in team.Players
-                                 where p.Base != player
+                                 where p != _p
                                  select NetworkGetEntityOwner(p.Base.Character.Handle)).ToArray();
 
-                var spawn = _p.CurrentTeam.Zone;
+                var spawn = _p.Team.Zone;
 
-                player.TriggerEvent("koth:playerJoinedTeam", teammates, spawn.PlayerSpawnCoords, spawn.VehDealerCoords, spawn.VehDealerPropCoords, _p.Class.Model);
+                player.TriggerEvent("koth:playerJoinedTeam", teammates, spawn.PlayerSpawnCoords, spawn.VehDealerCoords, spawn.VehDealerPropCoords, SessionMap.AO, DefaultPed);
+
                 player.TriggerEvent("chat:addMessage", new { args = new[] { $"You are now part of team {team.Name}" } });
-
-                return;
+            } else
+            {
+                player.TriggerEvent("chat:addMessage", new { args = new[] { $"Failed to join team {team.Name}" } });
             }
-
-            player.TriggerEvent("chat:addMessage", new { args = new[] { $"Failed to join team {team.Name}" } });
         }
 
         [EventHandler("koth:playerFinishSetup")]
         void OnPlayerFinishSetup ( [FromSource] Player player )
         {
-            if (DoesEntityExist(player.Character.Handle) && IsPedAPlayer(player.Character.Handle))
+            if (player != null && DoesEntityExist(player.Character.Handle) && IsPedAPlayer(player.Character.Handle))
             {
+                var p = ServerPlayers[player];
+
                 GiveWeaponToPed(player.Character.Handle,
-                                ServerPlayers[player].Class.DefaultWeapon,
-                                300,
+                                DefaultWeapon,
+                                350,
                                 false,
                                 true);
                 SetPedArmour(player.Character.Handle, 100);
+
+                var handle = p.Base.Character.Handle;
+                var uniform = p.Team.Zone.Uniform;
+
+                /* Mask */
+                SetPedComponentVariation(handle, 1, uniform[0][0], uniform[0][1], 0);
+
+                /* Gloves */
+                SetPedComponentVariation(handle, 3, uniform[1][0], uniform[1][1], 0);
+
+                /* Lower body */
+                SetPedComponentVariation(handle, 4, uniform[2][0], uniform[2][1], 0);
+
+                /* Shoes */
+                SetPedComponentVariation(handle, 6, uniform[3][0], uniform[3][1], 0);
+
+                /* Shirt */
+                SetPedComponentVariation(handle, 8, uniform[4][0], uniform[4][1], 0);
+
+                /* Jacket */
+                SetPedComponentVariation(handle, 11, uniform[5][0], uniform[5][1], 0);
             }
+
+
+        }
+
+        [EventHandler("koth:playerInsideSafeZone")]
+        void OnPlayerInsideSafeZone ( [FromSource] Player player )
+        {
+            Debug.WriteLine($"Player { player.Handle } inside safe zone.");
+        }
+
+        [EventHandler("koth:playerOutsideSafeZone")]
+        void OnPlayerOutsideSafeZone ( [FromSource] Player player )
+        {
+            Debug.WriteLine($"Player { player.Handle } left safe zone.");
+        }
+
+        [EventHandler("koth:playerInsideCombatZone")]
+        void OnPlayerInsideCombatZone ( [FromSource] Player player )
+        {
+            Debug.WriteLine($"Player { player.Handle } inside combat zone.");
+        }
+
+        [EventHandler("koth:playerOutsideCombatZone")]
+        void OnPlayerOutsideCombatZone ( [FromSource] Player player )
+        {
+            Debug.WriteLine($"Player { player.Handle } left combat zone.");
         }
 
         #endregion KOTHEvents
