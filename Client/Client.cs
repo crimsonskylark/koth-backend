@@ -148,7 +148,7 @@ namespace Client
 
             var team_id = ( teamIdObj as string ) ?? "";
 
-            TriggerServerEvent("koth:teamJoin", team_id);
+            TriggerServerEvent("koth:playerTeamJoin", team_id);
 
             cb(new
             {

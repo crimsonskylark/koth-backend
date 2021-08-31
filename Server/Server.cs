@@ -2,7 +2,6 @@
 using koth_server.Map;
 using Newtonsoft.Json;
 using Server.User;
-using Server.User.Classes;
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
@@ -28,17 +27,15 @@ namespace Server
 
     class Server : BaseScript
     {
-        readonly Dictionary<Player, KothPlayer> ServerPlayers = new();
-        readonly List<KothTeam> Teams = new();
-        readonly Map SessionMap = new();
-        readonly uint DefaultWeapon = (uint)GetHashKey("weapon_compactrifle");
-        readonly uint DefaultPed = (uint)GetHashKey("mp_m_freemode_01");
+        static readonly Dictionary<Player, KothPlayer> KothPlayerList = new();
+        static readonly List<KothTeam> Teams = new();
+
+        static Map SessionMap = new();
+
         public Server ( )
         {
-            Debug.WriteLine("server main started!");
-            Debug.WriteLine("setting up stuff");
+            Debug.WriteLine($"Creating KOTH environment...");
 
-            // All teams
             var config = LoadResourceFile(GetCurrentResourceName(), "config/gamemode.json");
 
             var map_config = JsonConvert.DeserializeObject<MapContainer>(config);
@@ -53,167 +50,75 @@ namespace Server
                 Teams.Add(new KothTeam(team_id, t.Name, t));
                 team_id += 1;
             }
+
+            EventHandlers["playerDropped"] += new Action<Player, string>(Events.Game.OnPlayerDropped);
+            EventHandlers["onServerResourceStart"] += new Action<string>(RebuildPlayerList);
+            EventHandlers["baseevents:onPlayerKilled"] += new Action<Player, int, ExpandoObject>(Events.Game.OnPlayerKilled);
+
+            EventHandlers["koth:playerTeamJoin"] += new Action<Player, string>(Events.Koth.OnTeamJoin);
+
+            EventHandlers["koth:playerFinishSetup"] += new Action<Player>(Events.Koth.OnPlayerFinishSetup);
+
+            EventHandlers["koth:playerInsideSafeZone"] += new Action<Player>(Events.Koth.OnPlayerInsideSafeZone);
+            EventHandlers["koth:playerOutsideSafeZone"] += new Action<Player>(Events.Koth.OnPlayerOutsideSafeZone);
+
+            EventHandlers["koth:playerInsideCombatZone"] += new Action<Player>(Events.Koth.OnPlayerInsideCombatZone);
+            EventHandlers["koth:playerOutsideCombatZone"] += new Action<Player>(Events.Koth.OnPlayerOutsideCombatZone);
         }
 
-        #region GameEvents
         [EventHandler("playerJoining")]
-        void OnPlayerJoining ( [FromSource] Player player, string _ )
+        private void AddPlayerToPlayerList ( [FromSource] Player p )
         {
-            Debug.WriteLine($"Player {player.Handle} has joined the server.");
-            ServerPlayers[player] = new KothPlayer(player);
+            Debug.WriteLine($"Added player to player list: { p.Handle }");
+            KothPlayerList.Add(p, new KothPlayer(p));
         }
 
-        [EventHandler("playerDropped")]
-        void OnPlayerDropped ( [FromSource] Player player, string reason )
+        private void RebuildPlayerList ( string name )
         {
-            if (ServerPlayers.TryGetValue(player, out KothPlayer p))
-            {
-                p.LeaveTime = DateTime.UtcNow;
-
-                Debug.WriteLine($"Player {player.Handle} has left the server at {p.LeaveTime}. (Reason: {reason})");
-
-                p.LeaveTeam();
-
-                if (ServerPlayers.Remove(player))
-                {
-                    Debug.WriteLine($"Removed player {player.Handle} from player list.");
-                }
-                else
-                {
-                    Debug.WriteLine($"Failed to remove {player.Handle} from player list.");
-                }
-                /* TODO: Save player information in database */
-            }
-            else
-            {
-                /* Should never be reached in production. */
-                Debug.WriteLine($"[!!!] Player not found.");
-            }
-        }
-
-        [EventHandler("onResourceStart")]
-        void OnResourceStart ( string name )
-        {
-            if (GetCurrentResourceName().Equals(name))
+            /* 
+             * This is useful during development so it's unecessary to 
+             * leave and re-join the server
+             */
+            if (name.Equals(GetCurrentResourceName()))
             {
                 foreach (var p in Players)
                 {
-                    Debug.WriteLine($"Adding players to player list after restart.");
-                    ServerPlayers.Add(p, new KothPlayer(p));
+                    KothPlayerList.Add(p, new KothPlayer(p));
                 }
             }
         }
-        #endregion GameEvents
 
-        #region BaseEvents
-
-        [EventHandler("baseevents:onPlayerKilled")]
-        private void OnPlayerKilled ( [FromSource] Player player, int killerType, ExpandoObject obj )
+        static internal KothPlayer GetPlayerByPlayerObj ( Player player )
         {
-            Debug.WriteLine("Player killed");
-            foreach (var v in obj)
-            {
-                Debug.WriteLine($"Key: {v.Key} value: {v.Value}");
-            }
+            if (KothPlayerList.ContainsKey(player))
+                return KothPlayerList[player];
+            return null;
         }
 
-        #endregion BaseEvents
-
-        #region KOTHEvents
-
-        [EventHandler("koth:teamJoin")]
-        private void OnTeamJoin ( [FromSource] Player player, string team_id )
+        static internal bool RemovePlayerFromPlayerList ( Player player )
         {
-            var valid_team = int.TryParse(team_id, out int IntTeamId);
-
-            if (string.IsNullOrEmpty(team_id) || !valid_team || IntTeamId < 0 || IntTeamId > 3)
-            {
-                Debug.WriteLine($"Invalid team: {IntTeamId}");
-                return;
-            }
-
-            var team = Teams.Find((t) => t.Id == IntTeamId-1);
-
-            if (ServerPlayers.TryGetValue(player, out KothPlayer _p) && _p.JoinTeam(team))
-            {
-                var teammates = (from p in team.Players
-                                 where p != _p
-                                 select NetworkGetEntityOwner(p.Base.Character.Handle)).ToArray();
-
-                var spawn = _p.Team.Zone;
-
-                player.TriggerEvent("koth:playerJoinedTeam", teammates, spawn.PlayerSpawnCoords, spawn.VehDealerCoords, spawn.VehDealerPropCoords, SessionMap.AO, DefaultPed);
-
-                player.TriggerEvent("chat:addMessage", new { args = new[] { $"You are now part of team {team.Name}" } });
-            } else
-            {
-                player.TriggerEvent("chat:addMessage", new { args = new[] { $"Failed to join team {team.Name}" } });
-            }
+            return KothPlayerList.ContainsKey(player) && KothPlayerList.Remove(player);
         }
 
-        [EventHandler("koth:playerFinishSetup")]
-        void OnPlayerFinishSetup ( [FromSource] Player player )
+        static internal void BroadcastEvent ( string ev_name, params object[] args )
         {
-            if (player != null && DoesEntityExist(player.Character.Handle) && IsPedAPlayer(player.Character.Handle))
-            {
-                var p = ServerPlayers[player];
-
-                GiveWeaponToPed(player.Character.Handle,
-                                DefaultWeapon,
-                                350,
-                                false,
-                                true);
-                SetPedArmour(player.Character.Handle, 100);
-
-                var handle = p.Base.Character.Handle;
-                var uniform = p.Team.Zone.Uniform;
-
-                /* Mask */
-                SetPedComponentVariation(handle, 1, uniform[0][0], uniform[0][1], 0);
-
-                /* Gloves */
-                SetPedComponentVariation(handle, 3, uniform[1][0], uniform[1][1], 0);
-
-                /* Lower body */
-                SetPedComponentVariation(handle, 4, uniform[2][0], uniform[2][1], 0);
-
-                /* Shoes */
-                SetPedComponentVariation(handle, 6, uniform[3][0], uniform[3][1], 0);
-
-                /* Shirt */
-                SetPedComponentVariation(handle, 8, uniform[4][0], uniform[4][1], 0);
-
-                /* Jacket */
-                SetPedComponentVariation(handle, 11, uniform[5][0], uniform[5][1], 0);
-            }
-
-
+            TriggerClientEvent(ev_name, args);
         }
 
-        [EventHandler("koth:playerInsideSafeZone")]
-        void OnPlayerInsideSafeZone ( [FromSource] Player player )
+        static internal KothTeam GetTeamById ( int id )
         {
-            Debug.WriteLine($"Player { player.Handle } inside safe zone.");
+            return Teams.Find(( t ) => t.Id == id);
         }
 
-        [EventHandler("koth:playerOutsideSafeZone")]
-        void OnPlayerOutsideSafeZone ( [FromSource] Player player )
+        static internal Map GetCurrentMap ( )
         {
-            Debug.WriteLine($"Player { player.Handle } left safe zone.");
+            return SessionMap;
         }
 
-        [EventHandler("koth:playerInsideCombatZone")]
-        void OnPlayerInsideCombatZone ( [FromSource] Player player )
+        static internal float[] GetCurrentCombatZone ( )
         {
-            Debug.WriteLine($"Player { player.Handle } inside combat zone.");
+            return SessionMap.AO;
         }
 
-        [EventHandler("koth:playerOutsideCombatZone")]
-        void OnPlayerOutsideCombatZone ( [FromSource] Player player )
-        {
-            Debug.WriteLine($"Player { player.Handle } left combat zone.");
-        }
-
-        #endregion KOTHEvents
     }
 }

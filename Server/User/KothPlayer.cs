@@ -1,16 +1,9 @@
 ﻿using CitizenFX.Core;
-using Server.User.Classes;
 using System;
-
-using static CitizenFX.Core.Native.API;
 
 namespace Server.User
 {
-    /*
-     * Represents a player inside the game.
-     * Not to be mistaken with `Player` provided by CFX
-     */
-    class KothPlayer : BaseScript
+    class KothPlayer
     {
         public Player Base { get; private set; }
         public string License { get; private set; }
@@ -28,9 +21,9 @@ namespace Server.User
         public int Level { get; private set; }
         public bool CanBeRevived { get; private set; }
 
-        public KothPlayer ( Player player )
+        public KothPlayer ( Player base_player )
         {
-            Base = player;
+            Base = base_player;
             JoinTime = DateTime.UtcNow;
             License = Utils.GetPlayerLicense(Base.Identifiers);
             Debug.WriteLine($"Player joined server at {JoinTime}");
@@ -43,6 +36,7 @@ namespace Server.User
             TotalMoney += SessionMoney;
             TotalKills += SessionKills;
             TotalDeaths += SessionDeaths;
+            // SavePlayerInformation();
             Debug.WriteLine($"Player leaving server at {LeaveTime}.");
         }
 
@@ -56,7 +50,6 @@ namespace Server.User
                 Team = t;
                 t.Players.Add(this);
                 Debug.WriteLine($"Player {Base.Name} joined team {Team.Name}");
-                TriggerClientEvent("koth:updateTeamCount", t.Id, t.Players.Count);
 
                 return true;
             }

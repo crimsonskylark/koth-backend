@@ -7,7 +7,7 @@
     <ProjectGuid>{45FA5C33-74E1-4FFC-B71C-0DCDD50E7EE5}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>koth_server</RootNamespace>
+    <RootNamespace>Server</RootNamespace>
     <AssemblyName>Koth.Server.net</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
@@ -53,11 +53,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Config.cs" />
+    <Compile Include="Events\Game.cs" />
+    <Compile Include="Events\Koth.cs" />
     <Compile Include="Map\Map.cs" />
     <Compile Include="Map\MapContainer.cs" />
     <Compile Include="Map\TeamZone.cs" />
-    <Compile Include="User\Classes\Infantry.cs" />
-    <Compile Include="User\Classes\PlayerClass.cs" />
     <Compile Include="Teams\CommandPost.cs" />
     <Compile Include="User\KothPlayer.cs" />
     <Compile Include="Teams\KothTeam.cs" />
