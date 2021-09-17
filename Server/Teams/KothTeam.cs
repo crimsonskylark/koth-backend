@@ -1,8 +1,7 @@
-﻿using CitizenFX.Core;
+﻿using System.Collections.Generic;
+using CitizenFX.Core;
 using koth_server.Map;
 using Server.User;
-using System;
-using System.Collections.Generic;
 
 namespace Server
 {
@@ -16,13 +15,13 @@ namespace Server
         public TeamZone Zone;
         public List<KothPlayer> Players = new();
 
-        public KothTeam()
+        public KothTeam ( )
         {
             Id = -1;
             Name = "";
         }
 
-        public KothTeam(int _team_id, string _team_name, TeamZone _zone)
+        public KothTeam ( int _team_id, string _team_name, TeamZone _zone )
         {
             Id = _team_id;
             Name = _team_name;
@@ -32,24 +31,24 @@ namespace Server
             Zone = _zone;
         }
 
-        public void AddFlagPoint()
+        public void AddFlagPoint ( )
         {
             Debug.WriteLine($"Flag point added to {Name}, total {PlayersOnHill}.");
             PlayersOnHill += 1;
         }
 
-        public void AddTeamPoint()
+        public void AddTeamPoint ( )
         {
             Debug.WriteLine($"Team point added to {Name}, total {Points}.");
             Points += 1;
         }
 
-        public Spawn GetSpawn()
+        public Spawn GetSpawn ( )
         {
             return new Spawn();
         }
 
-        public float[] GetPlayerSpawnLocation()
+        public float[] GetPlayerSpawnLocation ( )
         {
             return GetSpawn().PlayerSpawn;
         }

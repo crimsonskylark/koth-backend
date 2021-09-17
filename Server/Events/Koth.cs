@@ -1,16 +1,16 @@
 ﻿using System.Linq;
 using CitizenFX.Core;
-
+using Koth.Shared;
+using Newtonsoft.Json;
 using static CitizenFX.Core.Native.API;
 
 namespace Server.Events
 {
-    class Koth
+    internal class Koth : BaseScript
     {
-
-        static readonly uint DefaultPed = (uint)GetHashKey("mp_m_freemode_01");
-        static readonly uint DefaultWeapon = (uint)GetHashKey("weapon_compactrifle");
-        static readonly float[] CombatZone = Server.GetCurrentCombatZone();
+        private static readonly uint DefaultPed = (uint)GetHashKey("mp_m_freemode_01");
+        private static readonly uint DefaultWeapon = (uint)GetHashKey("weapon_compactrifle");
+        private static readonly float[] CombatZone = Server.GetCurrentCombatZone();
 
         internal static void OnTeamJoin ( [FromSource] Player player, string team_id )
         {
@@ -18,30 +18,34 @@ namespace Server.Events
 
             if (string.IsNullOrEmpty(team_id) || !valid_team || ParsedTeamId < 0 || ParsedTeamId > 3)
             {
-                Debug.WriteLine($"Invalid team: {ParsedTeamId}");
+                Debug.WriteLine($"[{player.Identifiers["fivem"]}] Tentou entrar em um time inválido: {ParsedTeamId}");
                 return;
             }
 
             var team = Server.GetTeamById(ParsedTeamId-1);
-            var playerObj = Server.GetPlayerByPlayerObj(player);
+            var p = Server.GetPlayerByPlayerObj(player);
 
-            if (playerObj.JoinTeam(team))
+            if (p.JoinTeam(team))
             {
-                var teammates = (from p in team.Players
-                                 where p != playerObj
-                                 select NetworkGetEntityOwner(p.Base.Character.Handle)).ToArray();
+                var teammates = (from _p in team.Players
+                                 where p != _p
+                                 select NetworkGetEntityOwner(_p.Base.Character.Handle)).ToArray();
 
-                var spawn = playerObj.Team.Zone;
+                var ctxObj = JsonConvert.SerializeObject(new SpawnContext {
+                    vehiclesDealerCoords = p.Team.Zone.VehDealerCoords,
+                    vehiclesDealerPropCoords = p.Team.Zone.VehDealerPropCoords,
+                    playerSpawnCoords = p.Team.Zone.PlayerSpawnCoords,
+                    playerTeammates = teammates,
+                    combatZone = CombatZone,
+                    playerModel = DefaultPed 
+                });
 
-                playerObj.Base.TriggerEvent("koth:playerJoinedTeam", teammates, spawn.PlayerSpawnCoords, spawn.VehDealerCoords, spawn.VehDealerPropCoords, CombatZone, DefaultPed);
-
-                playerObj.Base.TriggerEvent("chat:addMessage", new { args = new[] { $"You are now part of team {team.Name}" } });
+                p.Base.TriggerEvent("koth:playerJoinedTeam", ctxObj);
             }
             else
             {
-                playerObj.Base.TriggerEvent("chat:addMessage", new { args = new[] { $"Failed to join team {team.Name}" } });
+                p.Base.TriggerEvent("chat:addMessage", new { args = new[] { $"Falha ao tentar entrar no time ~g~{team.Name}" } });
             }
-
         }
 
         internal static void OnPlayerFinishSetup ( [FromSource] Player player )
@@ -56,7 +60,7 @@ namespace Server.Events
                             false,
                             true);
 
-            SetPedArmour(handle, 100);
+            SetPedArmour(handle, 50);
 
             var uniform = p.Team.Zone.Uniform;
 
@@ -81,11 +85,14 @@ namespace Server.Events
 
         internal static void OnPlayerInsideSafeZone ( [FromSource] Player player )
         {
-            Debug.WriteLine("Koth Inside Safe Zone");
+            var p = Server.GetPlayerByPlayerObj(player);
+            p.IsInsideSafeZone = true;
         }
 
         internal static void OnPlayerOutsideSafeZone ( [FromSource] Player player )
         {
+            var p = Server.GetPlayerByPlayerObj(player);
+            p.IsInsideSafeZone = false;
             Debug.WriteLine("Koth OnPlayerOutsideSafeZone");
         }
 

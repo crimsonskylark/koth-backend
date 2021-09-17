@@ -1,9 +1,9 @@
-﻿using CitizenFX.Core;
-using System;
+﻿using System;
+using CitizenFX.Core;
 
 namespace Server.User
 {
-    class KothPlayer
+    internal class KothPlayer
     {
         public Player Base { get; private set; }
         public string License { get; private set; }
@@ -20,18 +20,20 @@ namespace Server.User
         public float Experience { get; private set; }
         public int Level { get; private set; }
         public bool CanBeRevived { get; private set; }
+        public bool IsInsideSafeZone { get; set; } = true;
+        public bool IsInsideAO { get; set; }
 
         public KothPlayer ( Player base_player )
         {
             Base = base_player;
             JoinTime = DateTime.UtcNow;
             License = Utils.GetPlayerLicense(Base.Identifiers);
+            Debug.WriteLine($"Licença: {License}");
             Debug.WriteLine($"Player joined server at {JoinTime}");
         }
 
         ~KothPlayer ( )
         {
-
             LeaveTime = DateTime.UtcNow;
             TotalMoney += SessionMoney;
             TotalKills += SessionKills;

@@ -1,16 +1,17 @@
-﻿using CitizenFX.Core;
-using koth_server.Map;
-using Newtonsoft.Json;
-using Server.User;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Dynamic;
 using System.Linq;
+using System.Threading.Tasks;
+using CitizenFX.Core;
+using koth_server.Map;
+using Newtonsoft.Json;
+using Server.User;
 using static CitizenFX.Core.Native.API;
 
 namespace Server
 {
-    enum StateUpdate : int
+    internal enum StateUpdate : int
     {
         PlayerJoin,
         PlayerLeave,
@@ -25,12 +26,12 @@ namespace Server
         HillContested
     }
 
-    class Server : BaseScript
+    internal class Server : BaseScript
     {
-        static readonly Dictionary<Player, KothPlayer> KothPlayerList = new();
-        static readonly List<KothTeam> Teams = new();
+        private static readonly Dictionary<Player, KothPlayer> KothPlayerList = new();
+        private static readonly List<KothTeam> Teams = new();
 
-        static Map SessionMap = new();
+        private static Map SessionMap = new();
 
         public Server ( )
         {
@@ -75,9 +76,9 @@ namespace Server
 
         private void RebuildPlayerList ( string name )
         {
-            /* 
-             * This is useful during development so it's unecessary to 
-             * leave and re-join the server
+            /*
+             * This is useful during development so it's unecessary to
+             * leave and re-join the server after restarting the resource.
              */
             if (name.Equals(GetCurrentResourceName()))
             {
@@ -90,9 +91,7 @@ namespace Server
 
         static internal KothPlayer GetPlayerByPlayerObj ( Player player )
         {
-            if (KothPlayerList.ContainsKey(player))
-                return KothPlayerList[player];
-            return null;
+            return KothPlayerList.ContainsKey(player) ? KothPlayerList[player] : null;
         }
 
         static internal bool RemovePlayerFromPlayerList ( Player player )
@@ -120,5 +119,28 @@ namespace Server
             return SessionMap.AO;
         }
 
+        static private float lerp(int v0, int v1, float t)
+        {
+            return ( 1 - t ) * v0 + t * v1; 
+        }
+
+        [Tick]
+        private async Task HealSafePlayers ()
+        {
+            foreach (var p in KothPlayerList.Values)
+            {
+                var playerHandle = p.Base.Character.Handle;
+                if (p.IsInsideSafeZone && DoesEntityExist(playerHandle))
+                {
+                    var maxHealth = GetEntityMaxHealth(playerHandle);
+                    var currHealth = GetEntityHealth(playerHandle);
+                    if (currHealth < maxHealth)
+                    {
+                        p.Base.TriggerEvent("koth:safeHeal", (int)lerp(currHealth + 5, maxHealth, 0.0f));
+                    }
+                }
+            }
+            await Delay(500);
+        }
     }
 }

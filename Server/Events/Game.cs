@@ -2,17 +2,15 @@
 using System.Dynamic;
 using CitizenFX.Core;
 
-
 namespace Server.Events
 {
-    static class Game
+    internal static class Game
     {
         internal static void OnPlayerDropped ( [FromSource] Player player, string reason )
         {
-
             var p = Server.GetPlayerByPlayerObj(player);
 
-            if ( p != null )
+            if (p != null)
             {
                 p.LeaveTime = DateTime.UtcNow;
 
@@ -37,7 +35,7 @@ namespace Server.Events
             }
         }
 
-        internal static void OnPlayerKilled ( [FromSource] Player player, int killerType, ExpandoObject obj)
+        internal static void OnPlayerKilled ( [FromSource] Player player, int killerType, ExpandoObject obj )
         {
             Debug.WriteLine("Player killed");
             foreach (var v in obj)

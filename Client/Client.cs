@@ -1,16 +1,16 @@
-﻿using CitizenFX.Core;
-using CitizenFX.Core.Native;
-using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-
+using CitizenFX.Core;
+using CitizenFX.Core.Native;
+using Koth.Shared;
+using Newtonsoft.Json;
 using static CitizenFX.Core.Native.API;
 
 namespace Client
 {
-    class Client : BaseScript
+    internal class Client : BaseScript
     {
         private bool MenuOpen = true;
         private bool TeamSelectionOpen = false;
@@ -20,16 +20,16 @@ namespace Client
         private readonly uint VehiclesDealerModel = (uint)GetHashKey( "s_m_y_marine_03" );
         private readonly uint VehiclesDealerPropModel = (uint)GetHashKey( "insurgent2" );
 
-        private List<float> VehiclesDealerCoords;
-        private List<float> VehiclesDealerPropCoords;
-        private List<float> AO;
+        private readonly string SerializedFinishMsg = JsonConvert.SerializeObject(new { type = "finish_setup" });
+
+        private float[] VehiclesDealerCoords;
+        private float[] VehiclesDealerPropCoords;
+        private float[] AO;
 
         private dynamic SessionSpawnPoint;
 
         public Client ( )
         {
-            Debug.WriteLine("Starting up KOTH...");
-
             RegisterNuiCallbackType("toggleMenuVisibility");
             RegisterNuiCallbackType("toggleTeamSelection");
             RegisterNuiCallbackType("toggleClassSelection");
@@ -41,37 +41,35 @@ namespace Client
         #region GameEvents
 
         [EventHandler("onClientMapStart")]
-        void OnClientMapStart ( string _ )
+        private void OnClientMapStart ( string _ )
         {
             Exports["spawnmanager"].setAutoSpawn(false);
-
             if (BusyspinnerIsOn())
                 BusyspinnerOff();
-
         }
 
         [EventHandler("onClientResourceStart")]
-        void OnClientResourceStart ( string name )
+        private void OnClientResourceStart ( string name )
         {
             if (name.Equals(GetCurrentResourceName()))
             {
                 Debug.WriteLine("Bem-vindo ao servidor de King of the Hill do Faded!");
+
                 SetNuiFocus(MenuOpen, MenuOpen);
             }
         }
 
         [EventHandler("playerSpawned")]
-        async void OnPlayerSpawned ( object _ )
+        private async void OnPlayerSpawned ( object _ )
         {
             if (!CreatedVehiclesDealerNPC)
             {
-
                 RequestModel(VehiclesDealerModel);
                 RequestModel(VehiclesDealerPropModel);
 
                 while (!HasModelLoaded(VehiclesDealerModel) || !HasModelLoaded(VehiclesDealerPropModel))
                 {
-                    await Delay(250);
+                    await Delay(100);
                 }
 
                 float groundZero = VehiclesDealerCoords[2];
@@ -103,9 +101,8 @@ namespace Client
                 }
                 else
                 {
-                    Debug.WriteLine($"Failed to create vehicle dealer ped. Please report this error!");
+                    Debug.WriteLine($"Falha em criar o vendedor de veículos.");
                 }
-
             }
 
             Game.PlayerPed.DropsWeaponsOnDeath = false;
@@ -114,11 +111,10 @@ namespace Client
 
         #endregion GameEvents
 
-
         #region NUICallbacks
 
         [EventHandler("__cfx_nui:toggleTeamSelection")]
-        void OnToggleTeamSelection ( IDictionary<string, object> data, CallbackDelegate cb )
+        private void OnToggleTeamSelection ( IDictionary<string, object> data, CallbackDelegate cb )
         {
             TeamSelectionOpen = !TeamSelectionOpen;
             cb(new
@@ -128,7 +124,7 @@ namespace Client
         }
 
         [EventHandler("__cfx_nui:toggleMenu")]
-        void OnToggleMenu ( IDictionary<string, object> data, CallbackDelegate cb )
+        private void OnToggleMenu ( IDictionary<string, object> data, CallbackDelegate cb )
         {
             MenuOpen = !MenuOpen;
             cb(new
@@ -138,7 +134,7 @@ namespace Client
         }
 
         [EventHandler("__cfx_nui:teamSelection")]
-        void OnSelectTeam ( IDictionary<string, object> data, CallbackDelegate cb )
+        private void OnSelectTeam ( IDictionary<string, object> data, CallbackDelegate cb )
         {
             if (!data.TryGetValue("team_id", out var teamIdObj))
             {
@@ -158,11 +154,10 @@ namespace Client
 
         #endregion NUICallbacks
 
-
         #region TickRoutines
 
         [Tick]
-        async Task RevivePlayer ( )
+        private async Task RevivePlayer ( )
         {
             Game.DisableControlThisFrame(0, Control.ReplayStartStopRecordingSecondary);
             if (Game.PlayerPed.IsDead && IsDisabledControlPressed(0, (int)Control.ReplayStartStopRecordingSecondary))
@@ -175,7 +170,7 @@ namespace Client
         }
 
         [Tick]
-        async Task GetStateUpdate ( )
+        private async Task GetStateUpdate ( )
         {
             if (!Game.PlayerPed.IsDead)
             {
@@ -190,21 +185,25 @@ namespace Client
         #region GameModeEvents
 
         [EventHandler("koth:playerJoinedTeam")]
-        void OnPlayerJoinedTeam ( List<object> playerTeammates, List<object> spawnCoords, List<object> vehiclesDealerCoords, List<object> vehDealerPropCoords, List<object> combatZone, uint playerModel )
+        private void OnPlayerJoinedTeam ( string spawnInfo )
         {
+
             SendNuiMessage(JsonConvert.SerializeObject(new { type = "team_selection_toggle" }));
 
-            VehiclesDealerCoords = vehiclesDealerCoords.OfType<float>().ToList();
-            VehiclesDealerPropCoords = vehDealerPropCoords.OfType<float>().ToList();
+            var spawn = JsonConvert.DeserializeObject<SpawnContext>(spawnInfo);
+
+            VehiclesDealerCoords = spawn.vehiclesDealerCoords;
+            VehiclesDealerPropCoords = spawn.vehiclesDealerPropCoords;
 
             /* used in "playerSpawned" */
-            var playerSpawnCoords = spawnCoords.OfType<float>( ).ToList( );
+            var playerSpawnCoords = spawn.playerSpawnCoords;
 
             uint teamHash = 0;
 
             AddRelationshipGroup("PlayerTeam", ref teamHash);
 
-            var teammates = playerTeammates.OfType<int>().ToList();
+            var teammates = spawn.playerTeammates;
+
 
             foreach (var teammate in teammates)
             {
@@ -215,31 +214,40 @@ namespace Client
                 }
             }
 
+
             /* just reuse it in the future */
-            SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], model = playerModel, skipFade = false });
+            SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], model = spawn.playerModel, skipFade = false });
 
             Exports["spawnmanager"].spawnPlayer(SessionSpawnPoint);
 
-            AO = combatZone.OfType<float>().ToList();
+            AO = spawn.combatZone;
 
             Exports["polyzone"].setupGameZones(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], h = playerSpawnCoords[3] }, new { x = AO[0], y = AO[1], z = AO[2] });
 
-            SendNuiMessage(JsonConvert.SerializeObject(new { type = "finish_setup" }));
-
+            SendNuiMessage(SerializedFinishMsg);
             SetNuiFocus(false, false);
         }
 
         [EventHandler("koth:spawnPlayer")]
-        void SpawnPlayer ( float x, float y, float z, float heading, int model )
+        private void SpawnPlayer ( float x, float y, float z, float heading, int model )
         {
             Exports["spawnmanager"].spawnPlayer(new { x, y, z, heading, model, skipFade = false });
+        }
+
+        [EventHandler("koth:safeHeal")]
+        private void OnSafeHeal(int amount)
+        {
+            if (GetEntityHealth(Game.PlayerPed.Handle) < 200)
+            {
+                SetEntityHealth(Game.PlayerPed.Handle, amount);
+            }
         }
 
         #endregion GameModeEvents
 
         #region GameModeFunctions
 
-        void EntitySetAttr ( int entity )
+        private void EntitySetAttr ( int entity )
         {
             SetEntityAsMissionEntity(entity, true, true);
             SetEntityInvincible(entity, true);
