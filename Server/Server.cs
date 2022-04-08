@@ -11,7 +11,7 @@ using static CitizenFX.Core.Native.API;
 
 namespace Server
 {
-    internal enum StateUpdate : int
+    internal enum GameState : int
     {
         PlayerJoin,
         PlayerLeave,
@@ -127,13 +127,21 @@ namespace Server
         [Tick]
         private async Task HealSafePlayers ()
         {
-            foreach (var p in KothPlayerList.Values)
+            foreach (var _p in Players)
             {
-                var playerHandle = p.Base.Character.Handle;
-                if (p.IsInsideSafeZone && DoesEntityExist(playerHandle))
+                // still loading into the game
+                if (_p.Character == null)
                 {
-                    var maxHealth = GetEntityMaxHealth(playerHandle);
-                    var currHealth = GetEntityHealth(playerHandle);
+                    continue;
+                }
+
+                var p = GetPlayerByPlayerObj(_p);
+
+                if (p.IsInsideSafeZone && DoesEntityExist(p.Base.Character.Handle))
+                {
+                    var pHandle = p.Base.Character.Handle;
+                    var maxHealth = GetEntityMaxHealth(pHandle);
+                    var currHealth = GetEntityHealth(pHandle);
                     if (currHealth < maxHealth)
                     {
                         p.Base.TriggerEvent("koth:safeHeal", (int)lerp(currHealth + 5, maxHealth, 0.0f));

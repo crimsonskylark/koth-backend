@@ -27,6 +27,7 @@ namespace Server.User
         {
             Base = base_player;
             JoinTime = DateTime.UtcNow;
+
             License = Utils.GetPlayerLicense(Base.Identifiers);
             Debug.WriteLine($"Licença: {License}");
             Debug.WriteLine($"Player joined server at {JoinTime}");

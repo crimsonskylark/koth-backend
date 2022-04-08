@@ -87,6 +87,7 @@ namespace Server.Events
         {
             var p = Server.GetPlayerByPlayerObj(player);
             p.IsInsideSafeZone = true;
+            Debug.WriteLine("Koth OnPlayerInsideSafeZone");
         }
 
         internal static void OnPlayerOutsideSafeZone ( [FromSource] Player player )
@@ -98,11 +99,15 @@ namespace Server.Events
 
         internal static void OnPlayerInsideCombatZone ( [FromSource] Player player )
         {
+            var p = Server.GetPlayerByPlayerObj(player);
+            p.IsInsideAO = true;
             Debug.WriteLine("Koth OnPlayerInsideCombatZone");
         }
 
         internal static void OnPlayerOutsideCombatZone ( [FromSource] Player player )
         {
+            var p = Server.GetPlayerByPlayerObj(player);
+            p.IsInsideAO = false;
             Debug.WriteLine("Koth OnPlayerOutsideCombatZone");
         }
     }
