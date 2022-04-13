@@ -9,6 +9,9 @@
         public float[] combatZone;
 
         public int[] playerTeammates;
+        public string playerTeamName;
+
+        public string[] enemyTeamNames;
 
         public uint playerModel;
     }

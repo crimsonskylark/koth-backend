@@ -17,8 +17,8 @@ namespace Client
 
         private bool CreatedVehiclesDealerNPC = false;
 
-        private readonly uint VehiclesDealerModel = (uint)GetHashKey( "s_m_y_marine_03" );
-        private readonly uint VehiclesDealerPropModel = (uint)GetHashKey( "insurgent2" );
+        private readonly uint VehiclesDealerModel = (uint)GetHashKey("s_m_y_marine_03");
+        private readonly uint VehiclesDealerPropModel = (uint)GetHashKey("insurgent2");
 
         private readonly string SerializedFinishMsg = JsonConvert.SerializeObject(new { type = "finish_setup" });
 
@@ -26,9 +26,12 @@ namespace Client
         private float[] VehiclesDealerPropCoords;
         private float[] AO;
 
+        private List<int> EnemyTeamHashes = new List<int>();
+        private int PlayerTeamHash;
+
         private dynamic SessionSpawnPoint;
 
-        public Client ( )
+        public Client()
         {
             RegisterNuiCallbackType("toggleMenuVisibility");
             RegisterNuiCallbackType("toggleTeamSelection");
@@ -41,7 +44,7 @@ namespace Client
         #region GameEvents
 
         [EventHandler("onClientMapStart")]
-        private void OnClientMapStart ( string _ )
+        private void OnClientMapStart(string _)
         {
             Exports["spawnmanager"].setAutoSpawn(false);
             if (BusyspinnerIsOn())
@@ -49,7 +52,7 @@ namespace Client
         }
 
         [EventHandler("onClientResourceStart")]
-        private void OnClientResourceStart ( string name )
+        private void OnClientResourceStart(string name)
         {
             if (name.Equals(GetCurrentResourceName()))
             {
@@ -57,10 +60,11 @@ namespace Client
 
                 SetNuiFocus(MenuOpen, MenuOpen);
             }
+            NetworkSetFriendlyFireOption(false);
         }
 
         [EventHandler("playerSpawned")]
-        private async void OnPlayerSpawned ( object _ )
+        private async void OnPlayerSpawned(object _)
         {
             if (!CreatedVehiclesDealerNPC)
             {
@@ -75,20 +79,20 @@ namespace Client
                 float groundZero = VehiclesDealerCoords[2];
                 GetGroundZFor_3dCoord(VehiclesDealerCoords[0], VehiclesDealerCoords[1], VehiclesDealerCoords[2], ref groundZero, false);
 
-                var vehicleDealerHandle = CreatePed( 0, VehiclesDealerModel, VehiclesDealerCoords[0], VehiclesDealerCoords[1], groundZero, VehiclesDealerCoords[3], false, true );
+                var vehicleDealerHandle = CreatePed(0, VehiclesDealerModel, VehiclesDealerCoords[0], VehiclesDealerCoords[1], groundZero, VehiclesDealerCoords[3], false, true);
 
                 Function.Call((Hash)0x283978A15512B2FE, vehicleDealerHandle, false);
 
                 SetPedComponentVariation(vehicleDealerHandle, 1, 0, 1, 0);
                 SetPedComponentVariation(vehicleDealerHandle, 0, 0, 0, 0);
 
-                var vehiclesDealerPropHandle = CreateVehicle( VehiclesDealerPropModel,
+                var vehiclesDealerPropHandle = CreateVehicle(VehiclesDealerPropModel,
                                                    VehiclesDealerPropCoords[0],
                                                    VehiclesDealerPropCoords[1],
                                                    VehiclesDealerPropCoords[2],
                                                    VehiclesDealerPropCoords[3],
                                                    false,
-                                                   true );
+                                                   true);
 
                 SetVehicleDoorsLockedForAllPlayers(vehiclesDealerPropHandle, true);
                 SetVehicleDoorsLocked(vehiclesDealerPropHandle, 2);
@@ -114,7 +118,7 @@ namespace Client
         #region NUICallbacks
 
         [EventHandler("__cfx_nui:toggleTeamSelection")]
-        private void OnToggleTeamSelection ( IDictionary<string, object> data, CallbackDelegate cb )
+        private void OnToggleTeamSelection(IDictionary<string, object> data, CallbackDelegate cb)
         {
             TeamSelectionOpen = !TeamSelectionOpen;
             cb(new
@@ -124,7 +128,7 @@ namespace Client
         }
 
         [EventHandler("__cfx_nui:toggleMenu")]
-        private void OnToggleMenu ( IDictionary<string, object> data, CallbackDelegate cb )
+        private void OnToggleMenu(IDictionary<string, object> data, CallbackDelegate cb)
         {
             MenuOpen = !MenuOpen;
             cb(new
@@ -134,7 +138,7 @@ namespace Client
         }
 
         [EventHandler("__cfx_nui:teamSelection")]
-        private void OnSelectTeam ( IDictionary<string, object> data, CallbackDelegate cb )
+        private void OnSelectTeam(IDictionary<string, object> data, CallbackDelegate cb)
         {
             if (!data.TryGetValue("team_id", out var teamIdObj))
             {
@@ -142,7 +146,7 @@ namespace Client
                 return;
             }
 
-            var team_id = ( teamIdObj as string ) ?? "";
+            var team_id = (teamIdObj as string) ?? "";
 
             TriggerServerEvent("koth:playerTeamJoin", team_id);
 
@@ -157,7 +161,7 @@ namespace Client
         #region TickRoutines
 
         [Tick]
-        private async Task RevivePlayer ( )
+        private async Task RevivePlayer()
         {
             Game.DisableControlThisFrame(0, Control.ReplayStartStopRecordingSecondary);
             if (Game.PlayerPed.IsDead && IsDisabledControlPressed(0, (int)Control.ReplayStartStopRecordingSecondary))
@@ -170,7 +174,7 @@ namespace Client
         }
 
         [Tick]
-        private async Task GetStateUpdate ( )
+        private async Task GetStateUpdate()
         {
             if (!Game.PlayerPed.IsDead)
             {
@@ -180,12 +184,46 @@ namespace Client
             await Delay(100);
         }
 
+        [Tick]
+        private async Task TestRoutine()
+        {
+            var pos = Game.PlayerPed.Position;
+            var next = pos + (Vector3.Multiply(Game.PlayerPed.ForwardVector, 25.0f));
+            DrawLine(pos.X, pos.Y, pos.Z, next.X, next.Y, next.Z, 255, 255, 255, 255);
+
+            await Task.FromResult(0);
+        }
+
+        [Tick]
+        private async Task SetRelationships()
+        {
+            try
+            {
+                var curr = Game.PlayerPed;
+                var entity = curr.Handle;
+
+                SetEntityCanBeDamagedByRelationshipGroup(entity, false, PlayerTeamHash);
+
+                foreach (var enemy in EnemyTeamHashes)
+                {
+                    SetRelationshipBetweenGroups((int)Relationship.Hate, (uint)PlayerTeamHash, (uint)enemy);
+                    SetRelationshipBetweenGroups((int)Relationship.Hate, (uint)enemy, (uint)PlayerTeamHash);
+                }
+
+                SetCanAttackFriendly(entity, false, false);
+                NetworkSetFriendlyFireOption(false);
+            } catch (Exception ex)
+            {
+                Debug.WriteLine(ex.ToString());
+            }
+        }
+
         #endregion TickRoutines
 
         #region GameModeEvents
 
         [EventHandler("koth:playerJoinedTeam")]
-        private void OnPlayerJoinedTeam ( string spawnInfo )
+        private void OnPlayerJoinedTeam(string spawnInfo)
         {
 
             SendNuiMessage(JsonConvert.SerializeObject(new { type = "team_selection_toggle" }));
@@ -198,29 +236,36 @@ namespace Client
             /* used in "playerSpawned" */
             var playerSpawnCoords = spawn.playerSpawnCoords;
 
-            uint teamHash = 0;
+            uint temp = 0;
 
-            AddRelationshipGroup("PlayerTeam", ref teamHash);
+            AddRelationshipGroup(spawn.playerTeamName, ref temp);
 
-            var teammates = spawn.playerTeammates;
+            SetPedRelationshipGroupHash(Game.PlayerPed.Handle, temp);
 
+            PlayerTeamHash = (int)temp;
 
-            foreach (var teammate in teammates)
+            foreach (var enemyTeam in spawn.enemyTeamNames)
+            {
+                AddRelationshipGroup(enemyTeam, ref temp);
+                EnemyTeamHashes.Add((int)temp);
+            }
+
+            AO = spawn.combatZone;
+
+            foreach (var teammate in spawn.playerTeammates)
             {
                 if (teammate != 0)
                 {
-                    var b = AddBlipForEntity(teammate);
+                    var b = AddBlipForEntity(Players[teammate].Character.Handle);
                     SetBlipAsFriendly(b, true);
                 }
             }
-
 
             /* just reuse it in the future */
             SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], model = spawn.playerModel, skipFade = false });
 
             Exports["spawnmanager"].spawnPlayer(SessionSpawnPoint);
 
-            AO = spawn.combatZone;
 
             Exports["polyzone"].setupGameZones(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], h = playerSpawnCoords[3] }, new { x = AO[0], y = AO[1], z = AO[2] });
 
@@ -229,7 +274,7 @@ namespace Client
         }
 
         [EventHandler("koth:spawnPlayer")]
-        private void SpawnPlayer ( float x, float y, float z, float heading, int model )
+        private void SpawnPlayer(float x, float y, float z, float heading, int model)
         {
             Exports["spawnmanager"].spawnPlayer(new { x, y, z, heading, model, skipFade = false });
         }
@@ -243,11 +288,22 @@ namespace Client
             }
         }
 
+        [EventHandler("koth:newTeammate")]
+        private void OnNewTeammate(int netid)
+        {
+            if (netid != 0)
+            {
+                var p = Players[netid];
+                var b = AddBlipForEntity(p.Character.Handle);
+                SetBlipAsFriendly(b, true);
+            }
+        }
+
         #endregion GameModeEvents
 
         #region GameModeFunctions
 
-        private void EntitySetAttr ( int entity )
+        private void EntitySetAttr(int entity)
         {
             SetEntityAsMissionEntity(entity, true, true);
             SetEntityInvincible(entity, true);

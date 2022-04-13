@@ -109,6 +109,11 @@ namespace Server
             return Teams.Find(( t ) => t.Id == id);
         }
 
+        static internal List<string> GetTeamNames()
+        {
+            return (from t in Teams select t.Name).ToList();
+        }
+
         static internal Map GetCurrentMap ( )
         {
             return SessionMap;
@@ -144,7 +149,7 @@ namespace Server
                     var currHealth = GetEntityHealth(pHandle);
                     if (currHealth < maxHealth)
                     {
-                        p.Base.TriggerEvent("koth:safeHeal", (int)lerp(currHealth + 5, maxHealth, 0.0f));
+                        p.Base.TriggerEvent("koth:safeHeal", (int)lerp(currHealth + 5, maxHealth, 0.1f));
                     }
                 }
             }

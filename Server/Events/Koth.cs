@@ -27,9 +27,9 @@ namespace Server.Events
 
             if (p.JoinTeam(team))
             {
-                var teammates = (from _p in team.Players
-                                 where p != _p
-                                 select NetworkGetEntityOwner(_p.Base.Character.Handle)).ToArray();
+                var teammates = (from other in team.Players
+                                 where p != other
+                                 select NetworkGetEntityOwner(other.Base.Character.Handle)).ToArray();
 
                 var ctxObj = JsonConvert.SerializeObject(new SpawnContext {
                     vehiclesDealerCoords = p.Team.Zone.VehDealerCoords,
@@ -37,10 +37,21 @@ namespace Server.Events
                     playerSpawnCoords = p.Team.Zone.PlayerSpawnCoords,
                     playerTeammates = teammates,
                     combatZone = CombatZone,
-                    playerModel = DefaultPed 
-                });
+                    enemyTeamNames = Server.GetTeamNames().Where((t) => t != p.Team.Name).ToArray(),
+                    playerTeamName = p.Team.Name,
+                    playerModel = DefaultPed
+                }) ;
 
                 p.Base.TriggerEvent("koth:playerJoinedTeam", ctxObj);
+
+                foreach (var member in team.Players)
+                {
+                    if (member != p)
+                    {
+                        member.Base.TriggerEvent("koth:newTeammate", NetworkGetEntityOwner(p.Base.Character.Handle));
+                    }
+                }
+
             }
             else
             {
@@ -87,6 +98,7 @@ namespace Server.Events
         {
             var p = Server.GetPlayerByPlayerObj(player);
             p.IsInsideSafeZone = true;
+            p.Base.TriggerEvent("koth:toggleInsideSafeZoneCondi", p.IsInsideSafeZone);
             Debug.WriteLine("Koth OnPlayerInsideSafeZone");
         }
 
@@ -94,6 +106,7 @@ namespace Server.Events
         {
             var p = Server.GetPlayerByPlayerObj(player);
             p.IsInsideSafeZone = false;
+            p.Base.TriggerEvent("koth:toggleInsideSafeZoneCondi", p.IsInsideSafeZone);
             Debug.WriteLine("Koth OnPlayerOutsideSafeZone");
         }
 
