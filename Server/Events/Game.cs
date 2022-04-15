@@ -4,7 +4,7 @@ using CitizenFX.Core;
 
 namespace Server.Events
 {
-    internal static class Game
+    internal class Game
     {
         internal static void OnPlayerDropped ( [FromSource] Player player, string reason )
         {
@@ -17,6 +17,9 @@ namespace Server.Events
                 Debug.WriteLine($"Player {p.Base.Handle} has left the server at {p.LeaveTime}. (Reason: {reason})");
 
                 p.LeaveTeam();
+
+                Koth.OnPlayerOutsideSafeZone(player);
+                Koth.OnPlayerOutsideCombatZone(player);
 
                 if (Server.RemovePlayerFromPlayerList(player))
                 {
@@ -32,15 +35,6 @@ namespace Server.Events
             {
                 /* Should never be reached in production. */
                 Debug.WriteLine($"[!!!] Player not found.");
-            }
-        }
-
-        internal static void OnPlayerKilled ( [FromSource] Player player, int killerType, ExpandoObject obj )
-        {
-            Debug.WriteLine("Player killed");
-            foreach (var v in obj)
-            {
-                Debug.WriteLine($"Key: {v.Key} value: {v.Value}");
             }
         }
     }

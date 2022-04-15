@@ -3,7 +3,7 @@ using CitizenFX.Core;
 
 namespace Server.User
 {
-    internal class KothPlayer
+    internal class ServerPlayer
     {
         public Player Base { get; private set; }
         public string License { get; private set; }
@@ -14,7 +14,8 @@ namespace Server.User
         public int SessionKills { get; private set; }
         public int SessionDeaths { get; private set; }
         public int SessionMoney { get; private set; }
-        public KothTeam Team { get; private set; } = null;
+        public int SessionPoints { get; private set; }
+        public Team Team { get; private set; } = null;
         public DateTime JoinTime { get; private set; }
         public DateTime LeaveTime { get; set; }
         public float Experience { get; private set; }
@@ -22,8 +23,11 @@ namespace Server.User
         public bool CanBeRevived { get; private set; }
         public bool IsInsideSafeZone { get; set; } = true;
         public bool IsInsideAO { get; set; }
+        
 
-        public KothPlayer ( Player base_player )
+        // cached and used for canculations
+        public Vector3 SafeZoneVec3 = new Vector3();
+        public ServerPlayer ( Player base_player )
         {
             Base = base_player;
             JoinTime = DateTime.UtcNow;
@@ -33,7 +37,7 @@ namespace Server.User
             Debug.WriteLine($"Player joined server at {JoinTime}");
         }
 
-        ~KothPlayer ( )
+        ~ServerPlayer ( )
         {
             LeaveTime = DateTime.UtcNow;
             TotalMoney += SessionMoney;
@@ -43,7 +47,7 @@ namespace Server.User
             Debug.WriteLine($"Player leaving server at {LeaveTime}.");
         }
 
-        public bool JoinTeam ( KothTeam t )
+        public bool JoinTeam ( Team t )
         {
             if (!t.Equals(Team))
             {
@@ -52,7 +56,12 @@ namespace Server.User
 
                 Team = t;
                 t.Players.Add(this);
+
                 Debug.WriteLine($"Player {Base.Name} joined team {Team.Name}");
+
+                SafeZoneVec3.X = Team.Zone.SafeZone[0];
+                SafeZoneVec3.Y = Team.Zone.SafeZone[1];
+                SafeZoneVec3.Z = Team.Zone.SafeZone[2];
 
                 return true;
             }
@@ -64,6 +73,30 @@ namespace Server.User
             Debug.WriteLine($"Player {Base.Name} left team {Team.Name}");
             if (Team != null)
                 Team.Players.Remove(this);
+        }
+
+        internal void AddKill()
+        {
+            SessionKills += 1;
+            Debug.WriteLine($"Added one kill to { Base.Name }, total kills { SessionKills }");
+        }
+
+        internal void AddDeath()
+        {
+            SessionDeaths += 1;
+            Debug.WriteLine($"Added one death to { Base.Name }, total kills { SessionDeaths }");
+        }
+
+        internal void AddMoneyToAccount(int amount)
+        {
+            TotalMoney += amount;
+            Debug.WriteLine($"Added ${amount} to \"{Base.Name}\"'s account, total ${TotalMoney}");
+        }
+
+        internal void AddPointsToPlayer(int amount = 10)
+        {
+            SessionPoints += amount;
+            Debug.WriteLine($"Added {amount} points to \"{Base.Name}\"");
         }
 
         public void Respawn ( )

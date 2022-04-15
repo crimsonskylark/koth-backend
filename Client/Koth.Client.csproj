@@ -7,7 +7,7 @@
     <ProjectGuid>{C399D527-526B-4689-A739-7A2C4A8CE997}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>KOTHFivem</RootNamespace>
+    <RootNamespace>Client</RootNamespace>
     <AssemblyName>Koth.Client.net</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>

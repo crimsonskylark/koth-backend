@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace koth_server.Map
+namespace Server.Map
 {
     public class TeamZone
     {

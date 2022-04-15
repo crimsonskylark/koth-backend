@@ -10,19 +10,20 @@ namespace Server.Events
     {
         private static readonly uint DefaultPed = (uint)GetHashKey("mp_m_freemode_01");
         private static readonly uint DefaultWeapon = (uint)GetHashKey("weapon_compactrifle");
-        private static readonly float[] CombatZone = Server.GetCurrentCombatZone();
+        private static readonly float[] CombatZone = Server.Match.GetCurrentAO();
 
-        internal static void OnTeamJoin ( [FromSource] Player player, string team_id )
+        internal static void OnTeamJoin ( [FromSource] Player player, string teamId )
         {
-            var valid_team = int.TryParse(team_id, out int ParsedTeamId);
+            var isTeamValid = int.TryParse(teamId, out int ParsedTeamId);
 
-            if (string.IsNullOrEmpty(team_id) || !valid_team || ParsedTeamId < 0 || ParsedTeamId > 3)
+            if (string.IsNullOrEmpty(teamId) || !isTeamValid || ParsedTeamId < 0 || ParsedTeamId > 3)
             {
                 Debug.WriteLine($"[{player.Identifiers["fivem"]}] Tentou entrar em um time inválido: {ParsedTeamId}");
                 return;
             }
 
-            var team = Server.GetTeamById(ParsedTeamId-1);
+            var team = Server.Match.GetTeamById(ParsedTeamId-1);
+
             var p = Server.GetPlayerByPlayerObj(player);
 
             if (p.JoinTeam(team))
@@ -37,7 +38,7 @@ namespace Server.Events
                     playerSpawnCoords = p.Team.Zone.PlayerSpawnCoords,
                     playerTeammates = teammates,
                     combatZone = CombatZone,
-                    enemyTeamNames = Server.GetTeamNames().Where((t) => t != p.Team.Name).ToArray(),
+                    enemyTeamNames = Server.Match.GetTeamNames().Where((t) => t != p.Team.Name).ToArray(),
                     playerTeamName = p.Team.Name,
                     playerModel = DefaultPed
                 }) ;
@@ -98,7 +99,6 @@ namespace Server.Events
         {
             var p = Server.GetPlayerByPlayerObj(player);
             p.IsInsideSafeZone = true;
-            p.Base.TriggerEvent("koth:toggleInsideSafeZoneCondi", p.IsInsideSafeZone);
             Debug.WriteLine("Koth OnPlayerInsideSafeZone");
         }
 
@@ -106,7 +106,6 @@ namespace Server.Events
         {
             var p = Server.GetPlayerByPlayerObj(player);
             p.IsInsideSafeZone = false;
-            p.Base.TriggerEvent("koth:toggleInsideSafeZoneCondi", p.IsInsideSafeZone);
             Debug.WriteLine("Koth OnPlayerOutsideSafeZone");
         }
 
@@ -114,6 +113,7 @@ namespace Server.Events
         {
             var p = Server.GetPlayerByPlayerObj(player);
             p.IsInsideAO = true;
+            Server.Match.AddFlagPointToTeam(p.Team);
             Debug.WriteLine("Koth OnPlayerInsideCombatZone");
         }
 
@@ -121,6 +121,7 @@ namespace Server.Events
         {
             var p = Server.GetPlayerByPlayerObj(player);
             p.IsInsideAO = false;
+            Server.Match.RemoveFlagPointFromTeam(p.Team);
             Debug.WriteLine("Koth OnPlayerOutsideCombatZone");
         }
     }

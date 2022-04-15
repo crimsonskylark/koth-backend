@@ -1,11 +1,11 @@
 ﻿using System.Collections.Generic;
 using CitizenFX.Core;
-using koth_server.Map;
+using Server.Map;
 using Server.User;
 
 namespace Server
 {
-    internal class KothTeam
+    internal class Team
     {
         public int Id { get; }
         public string Name { get; }
@@ -13,15 +13,15 @@ namespace Server
         public int PlayersOnHill { get; private set; } = 0;
         public int Points { get; private set; } = 0;
         public TeamZone Zone;
-        public List<KothPlayer> Players = new();
+        public List<ServerPlayer> Players = new();
 
-        public KothTeam ( )
+        public Team ( )
         {
             Id = -1;
             Name = "";
         }
 
-        public KothTeam ( int _team_id, string _team_name, TeamZone _zone )
+        public Team ( int _team_id, string _team_name, TeamZone _zone )
         {
             Id = _team_id;
             Name = _team_name;
@@ -31,16 +31,27 @@ namespace Server
             Zone = _zone;
         }
 
-        public void AddFlagPoint ( )
+        internal void AddFlagPoint ( )
         {
-            Debug.WriteLine($"Flag point added to {Name}, total {PlayersOnHill}.");
             PlayersOnHill += 1;
+            Debug.WriteLine($"Flag point added to {Name}, total {PlayersOnHill}.");
         }
 
-        public void AddTeamPoint ( )
+        internal void SetFlagPoints(int newval)
         {
-            Debug.WriteLine($"Team point added to {Name}, total {Points}.");
+            PlayersOnHill = newval;
+        }
+
+        internal void AddTeamPoint ( )
+        {
             Points += 1;
+            Debug.WriteLine($"Team point added to {Name}, total {Points}.");
+        }
+
+        internal void RemoveFlagPoint()
+        {
+            PlayersOnHill -= 1;
+            Debug.WriteLine($"Flag point added to {Name}, total {PlayersOnHill}.");
         }
 
         public Spawn GetSpawn ( )

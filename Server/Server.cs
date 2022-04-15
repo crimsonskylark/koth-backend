@@ -4,34 +4,18 @@ using System.Dynamic;
 using System.Linq;
 using System.Threading.Tasks;
 using CitizenFX.Core;
-using koth_server.Map;
+using Server.Map;
 using Newtonsoft.Json;
 using Server.User;
 using static CitizenFX.Core.Native.API;
 
 namespace Server
 {
-    internal enum GameState : int
-    {
-        PlayerJoin,
-        PlayerLeave,
-        PlayerDeath,
-        PlayerKill,
-        PlayerOnHill,
-        TeamJoin,
-        TeamLeave,
-        TeamPoint,
-        HillCaptured,
-        HillLost,
-        HillContested
-    }
 
     internal class Server : BaseScript
     {
-        private static readonly Dictionary<Player, KothPlayer> KothPlayerList = new();
-        private static readonly List<KothTeam> Teams = new();
-
-        private static Map SessionMap = new();
+        private static readonly Dictionary<Player, ServerPlayer> PlayersInGame = new();
+        public static MatchManager Match;
 
         public Server ( )
         {
@@ -39,25 +23,17 @@ namespace Server
 
             var config = LoadResourceFile(GetCurrentResourceName(), "config/gamemode.json");
 
-            var map_config = JsonConvert.DeserializeObject<MapContainer>(config);
+            var mapCfg = JsonConvert.DeserializeObject<MapContainer>(config);
 
-            var r = new Random().Next(0, map_config.Maps.Count() - 1);
-            SessionMap = map_config.Maps[r];
-
-            int team_id = 0;
-
-            foreach (var t in SessionMap.Teams)
-            {
-                Teams.Add(new KothTeam(team_id, t.Name, t));
-                team_id += 1;
-            }
+            Match = new(mapCfg);
 
             EventHandlers["playerDropped"] += new Action<Player, string>(Events.Game.OnPlayerDropped);
             EventHandlers["onServerResourceStart"] += new Action<string>(RebuildPlayerList);
-            EventHandlers["baseevents:onPlayerKilled"] += new Action<Player, int, ExpandoObject>(Events.Game.OnPlayerKilled);
+
+            EventHandlers["baseevents:onPlayerKilled"] += new Action<Player, int, ExpandoObject>(OnPlayerKilled);
 
             EventHandlers["koth:playerTeamJoin"] += new Action<Player, string>(Events.Koth.OnTeamJoin);
-
+            
             EventHandlers["koth:playerFinishSetup"] += new Action<Player>(Events.Koth.OnPlayerFinishSetup);
 
             EventHandlers["koth:playerInsideSafeZone"] += new Action<Player>(Events.Koth.OnPlayerInsideSafeZone);
@@ -71,7 +47,7 @@ namespace Server
         private void AddPlayerToPlayerList ( [FromSource] Player p )
         {
             Debug.WriteLine($"Added player to player list: { p.Handle }");
-            KothPlayerList.Add(p, new KothPlayer(p));
+            PlayersInGame.Add(p, new ServerPlayer(p));
         }
 
         private void RebuildPlayerList ( string name )
@@ -84,19 +60,19 @@ namespace Server
             {
                 foreach (var p in Players)
                 {
-                    KothPlayerList.Add(p, new KothPlayer(p));
+                    PlayersInGame.Add(p, new ServerPlayer(p));
                 }
             }
         }
 
-        static internal KothPlayer GetPlayerByPlayerObj ( Player player )
+        static internal ServerPlayer GetPlayerByPlayerObj ( Player player )
         {
-            return KothPlayerList.ContainsKey(player) ? KothPlayerList[player] : null;
+            return PlayersInGame.ContainsKey(player) ? PlayersInGame[player] : null;
         }
 
         static internal bool RemovePlayerFromPlayerList ( Player player )
         {
-            return KothPlayerList.ContainsKey(player) && KothPlayerList.Remove(player);
+            return PlayersInGame.ContainsKey(player) && PlayersInGame.Remove(player);
         }
 
         static internal void BroadcastEvent ( string ev_name, params object[] args )
@@ -104,29 +80,26 @@ namespace Server
             TriggerClientEvent(ev_name, args);
         }
 
-        static internal KothTeam GetTeamById ( int id )
+        internal void OnPlayerKilled([FromSource] Player player, int killerType, ExpandoObject obj)
         {
-            return Teams.Find(( t ) => t.Id == id);
-        }
+            Debug.WriteLine("Player killed");
 
-        static internal List<string> GetTeamNames()
-        {
-            return (from t in Teams select t.Name).ToList();
-        }
+            var killerEnt = GetPedSourceOfDeath(player.Character.Handle);
+            var killerPlayerObj = Players[NetworkGetNetworkIdFromEntity(killerEnt)];
 
-        static internal Map GetCurrentMap ( )
-        {
-            return SessionMap;
-        }
+            Debug.WriteLine($"({killerEnt}) Name: { killerPlayerObj.Name }, Type: { GetEntityType(killerEnt) }");
 
-        static internal float[] GetCurrentCombatZone ( )
-        {
-            return SessionMap.AO;
-        }
+            foreach (var v in obj)
+            {
+                Debug.WriteLine($"Key: {v.Key} value: {v.Value}");
 
-        static private float lerp(int v0, int v1, float t)
-        {
-            return ( 1 - t ) * v0 + t * v1; 
+                if (v.Key == "killerinveh" && v.Value.ToString().Equals("True"))
+                {
+                    Debug.WriteLine("Player got run over.");
+                }
+            }
+
+            //SettlePlayerDeath(player);
         }
 
         [Tick]
@@ -141,7 +114,7 @@ namespace Server
                 }
 
                 var p = GetPlayerByPlayerObj(_p);
-
+                
                 if (p.IsInsideSafeZone && DoesEntityExist(p.Base.Character.Handle))
                 {
                     var pHandle = p.Base.Character.Handle;
@@ -149,10 +122,25 @@ namespace Server
                     var currHealth = GetEntityHealth(pHandle);
                     if (currHealth < maxHealth)
                     {
-                        p.Base.TriggerEvent("koth:safeHeal", (int)lerp(currHealth + 5, maxHealth, 0.1f));
+                        p.Base.TriggerEvent("koth:safeHeal", (int)Utils.lerp(currHealth + 5, maxHealth, 0.1f));
                     }
                 }
             }
+            await Delay(500);
+        }
+
+        [Tick]
+        private async Task MainGameLoop()
+        {
+            try
+            {
+                string data = Match.StateQueue.Dequeue();
+                Debug.WriteLine($"Sending state update to client: { data }");
+                BroadcastEvent("koth:StateUpdate", data);
+
+            } catch (InvalidOperationException)
+            {}
+
             await Delay(500);
         }
     }

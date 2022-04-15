@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using CitizenFX.Core;
 using CitizenFX.Core.Native;
@@ -148,6 +147,8 @@ namespace Client
 
             var team_id = (teamIdObj as string) ?? "";
 
+            Debug.WriteLine($"Trying to join team {team_id}");
+
             TriggerServerEvent("koth:playerTeamJoin", team_id);
 
             cb(new
@@ -163,14 +164,14 @@ namespace Client
         [Tick]
         private async Task RevivePlayer()
         {
-            Game.DisableControlThisFrame(0, Control.ReplayStartStopRecordingSecondary);
-            if (Game.PlayerPed.IsDead && IsDisabledControlPressed(0, (int)Control.ReplayStartStopRecordingSecondary))
+            Game.DisableControlThisFrame(0, Control.ReplayStartStopRecording);
+            if (Game.PlayerPed.IsDead && IsDisabledControlPressed(0, (int)Control.ReplayStartStopRecording))
             {
                 NetworkResurrectLocalPlayer(Game.PlayerPed.Position.X, Game.PlayerPed.Position.Y, Game.PlayerPed.Position.Z, Game.PlayerPed.Heading, false, false);
                 Game.PlayerPed.IsInvincible = false;
                 Game.PlayerPed.ClearBloodDamage();
             }
-            await Delay(100);
+            await Delay(0);
         }
 
         [Tick]
@@ -188,8 +189,38 @@ namespace Client
         private async Task TestRoutine()
         {
             var pos = Game.PlayerPed.Position;
-            var next = pos + (Vector3.Multiply(Game.PlayerPed.ForwardVector, 25.0f));
-            DrawLine(pos.X, pos.Y, pos.Z, next.X, next.Y, next.Z, 255, 255, 255, 255);
+            var next = pos + (Game.PlayerPed.ForwardVector * 25.0f);
+            DrawLine(pos.X, pos.Y, pos.Z + 0.4f, next.X, next.Y, next.Z + 0.4f, 255, 255, 255, 255);
+
+            var entities = GetGamePool("CPed");
+
+            foreach (int ent in entities)
+            {
+                if (!IsPedHuman(ent))
+                    continue;
+
+                Vector3 cd = GetEntityCoords(ent, false);
+
+                if (cd.Z < 0)
+                    continue;
+
+                switch (cd.DistanceToSquared(pos))
+                {
+                    case var dis when dis <= 800.0f:
+                        {
+                            DrawLine(pos.X, pos.Y, pos.Z, cd.X, cd.Y, cd.Z, 61, 224, 71, 255);
+                            break;
+                        }
+                    case var dis when dis >= 2000.0f:
+                        {
+                            DrawLine(pos.X, pos.Y, pos.Z, cd.X, cd.Y, cd.Z, 224, 83, 137, 255);
+                            break;
+                        }
+                    default:
+                        continue;
+                }
+
+            }
 
             await Task.FromResult(0);
         }
@@ -212,7 +243,8 @@ namespace Client
 
                 SetCanAttackFriendly(entity, false, false);
                 NetworkSetFriendlyFireOption(false);
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 Debug.WriteLine(ex.ToString());
             }
@@ -297,6 +329,13 @@ namespace Client
                 var b = AddBlipForEntity(p.Character.Handle);
                 SetBlipAsFriendly(b, true);
             }
+        }
+
+        [EventHandler("koth:StateUpdate")]
+        private void OnStateUpdate(string newState)
+        {
+            Debug.WriteLine(newState);
+            SendNuiMessage(newState);
         }
 
         #endregion GameModeEvents
