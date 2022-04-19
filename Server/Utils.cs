@@ -1,17 +1,16 @@
 ﻿using CitizenFX.Core;
-using System.Linq;
 
 namespace Server
 {
     public static class Utils
     {
 
-        public static string GetPlayerLicense(IdentifierCollection identifiers)
+        public static string GetPlayerLicense(IdentifierCollection identifiers, string type = "license")
         {
-            return identifiers.Where((id) => id.StartsWith("license:")).FirstOrDefault();
+            return identifiers[type];
         }
 
-        static public float lerp(int v0, int v1, float t)
+        public static float lerp(int v0, int v1, float t) 
         {
             return (1 - t) * v0 + t * v1;
         }

@@ -192,37 +192,7 @@ namespace Client
             var next = pos + (Game.PlayerPed.ForwardVector * 25.0f);
             DrawLine(pos.X, pos.Y, pos.Z + 0.4f, next.X, next.Y, next.Z + 0.4f, 255, 255, 255, 255);
 
-            var entities = GetGamePool("CPed");
-
-            foreach (int ent in entities)
-            {
-                if (!IsPedHuman(ent))
-                    continue;
-
-                Vector3 cd = GetEntityCoords(ent, false);
-
-                if (cd.Z < 0)
-                    continue;
-
-                switch (cd.DistanceToSquared(pos))
-                {
-                    case var dis when dis <= 800.0f:
-                        {
-                            DrawLine(pos.X, pos.Y, pos.Z, cd.X, cd.Y, cd.Z, 61, 224, 71, 255);
-                            break;
-                        }
-                    case var dis when dis >= 2000.0f:
-                        {
-                            DrawLine(pos.X, pos.Y, pos.Z, cd.X, cd.Y, cd.Z, 224, 83, 137, 255);
-                            break;
-                        }
-                    default:
-                        continue;
-                }
-
-            }
-
-            await Task.FromResult(0);
+            await Delay(0);
         }
 
         [Tick]
@@ -286,7 +256,7 @@ namespace Client
 
             foreach (var teammate in spawn.playerTeammates)
             {
-                if (teammate != 0)
+                if (teammate != 0 && NetworkIsPlayerConnected(teammate))
                 {
                     var b = AddBlipForEntity(Players[teammate].Character.Handle);
                     SetBlipAsFriendly(b, true);
@@ -297,7 +267,6 @@ namespace Client
             SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], model = spawn.playerModel, skipFade = false });
 
             Exports["spawnmanager"].spawnPlayer(SessionSpawnPoint);
-
 
             Exports["polyzone"].setupGameZones(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], h = playerSpawnCoords[3] }, new { x = AO[0], y = AO[1], z = AO[2] });
 

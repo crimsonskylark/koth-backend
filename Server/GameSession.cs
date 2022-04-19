@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Dynamic;
-using System.Linq;
 using System.Threading.Tasks;
 using CitizenFX.Core;
 using Server.Map;
@@ -12,20 +11,24 @@ using static CitizenFX.Core.Native.API;
 namespace Server
 {
 
-    internal class Server : BaseScript
+    internal class GameSession : BaseScript
     {
-        private static readonly Dictionary<Player, ServerPlayer> PlayersInGame = new();
+        private static Dictionary<Player, KothPlayer> PlayersInGame;
         public static MatchManager Match;
 
-        public Server ( )
+        internal readonly int CV_MAX_CLIENTS = GetConvarInt("sv_maxclients", 64);
+
+        public GameSession ( )
         {
-            Debug.WriteLine($"Creating KOTH environment...");
+            Debug.WriteLine($"Creating KotH environment...");
 
             var config = LoadResourceFile(GetCurrentResourceName(), "config/gamemode.json");
 
             var mapCfg = JsonConvert.DeserializeObject<MapContainer>(config);
 
-            Match = new(mapCfg);
+            PlayersInGame = new(CV_MAX_CLIENTS);
+
+            Match = new(mapCfg, this);
 
             EventHandlers["playerDropped"] += new Action<Player, string>(Events.Game.OnPlayerDropped);
             EventHandlers["onServerResourceStart"] += new Action<string>(RebuildPlayerList);
@@ -47,7 +50,13 @@ namespace Server
         private void AddPlayerToPlayerList ( [FromSource] Player p )
         {
             Debug.WriteLine($"Added player to player list: { p.Handle }");
-            PlayersInGame.Add(p, new ServerPlayer(p));
+            PlayersInGame.Add(p, new KothPlayer(p));
+            Match.QueueMatchUpdate(new
+            {
+                type = "game_state_update",
+                update_type = GameState.PlayerJoin,
+                name = p.Name
+            });
         }
 
         private void RebuildPlayerList ( string name )
@@ -60,12 +69,12 @@ namespace Server
             {
                 foreach (var p in Players)
                 {
-                    PlayersInGame.Add(p, new ServerPlayer(p));
+                    PlayersInGame.Add(p, new KothPlayer(p));
                 }
             }
         }
 
-        static internal ServerPlayer GetPlayerByPlayerObj ( Player player )
+        static internal KothPlayer GetPlayerByPlayerObj ( Player player )
         {
             return PlayersInGame.ContainsKey(player) ? PlayersInGame[player] : null;
         }
@@ -83,20 +92,40 @@ namespace Server
         internal void OnPlayerKilled([FromSource] Player player, int killerType, ExpandoObject obj)
         {
             Debug.WriteLine("Player killed");
+            
+            var killerEnt = Entity.FromHandle(GetPedSourceOfDeath(player.Character.Handle));
 
-            var killerEnt = GetPedSourceOfDeath(player.Character.Handle);
-            var killerPlayerObj = Players[NetworkGetNetworkIdFromEntity(killerEnt)];
-
-            Debug.WriteLine($"({killerEnt}) Name: { killerPlayerObj.Name }, Type: { GetEntityType(killerEnt) }");
-
-            foreach (var v in obj)
+            if (killerEnt != null)
             {
-                Debug.WriteLine($"Key: {v.Key} value: {v.Value}");
-
-                if (v.Key == "killerinveh" && v.Value.ToString().Equals("True"))
+                if (killerEnt.GetType() == typeof(Ped))
                 {
-                    Debug.WriteLine("Player got run over.");
+                    
+                    var killer = GetPlayerByPlayerObj(killerEnt.Owner);
+                    var deceased = GetPlayerByPlayerObj(player);
+
+                    if (killer.Team != deceased.Team)
+                    {
+                        Match.AddKillToPlayer(killer);
+                        Match.AddDeathToPlayer(deceased);
+
+                        Debug.WriteLine($"Added kill to { killer.CfxPlayer.Name }, total { killer.SessionKills } ($800)");
+                        Debug.WriteLine($"Added death to { deceased.CfxPlayer.Name }, total { deceased.SessionDeaths }");
+
+                        Match.QueueMatchUpdate(new 
+                        { 
+                            type = "game_state_update", 
+                            update_type = GameState.PlayerKill, 
+                            killer = killer.CfxPlayer.Name, 
+                            deceased = deceased.CfxPlayer.Name 
+                        });
+
+                    }
+
+                } else if (killerEnt.GetType() == typeof(Vehicle))
+                {
+                    Debug.WriteLine($"Player was killed by vehicle.");
                 }
+                Debug.WriteLine($"Killer entity: { killerEnt }");
             }
 
             //SettlePlayerDeath(player);
@@ -115,14 +144,14 @@ namespace Server
 
                 var p = GetPlayerByPlayerObj(_p);
                 
-                if (p.IsInsideSafeZone && DoesEntityExist(p.Base.Character.Handle))
+                if (p.IsInsideSafeZone && DoesEntityExist(p.CfxPlayer.Character.Handle))
                 {
-                    var pHandle = p.Base.Character.Handle;
+                    var pHandle = p.CfxPlayer.Character.Handle;
                     var maxHealth = GetEntityMaxHealth(pHandle);
                     var currHealth = GetEntityHealth(pHandle);
                     if (currHealth < maxHealth)
                     {
-                        p.Base.TriggerEvent("koth:safeHeal", (int)Utils.lerp(currHealth + 5, maxHealth, 0.1f));
+                        p.CfxPlayer.TriggerEvent("koth:safeHeal", (int)Utils.lerp(currHealth + 5, maxHealth, 0.1f));
                     }
                 }
             }
@@ -134,14 +163,14 @@ namespace Server
         {
             try
             {
-                string data = Match.StateQueue.Dequeue();
-                Debug.WriteLine($"Sending state update to client: { data }");
+                string data = Match.State.Dequeue();
                 BroadcastEvent("koth:StateUpdate", data);
+
 
             } catch (InvalidOperationException)
             {}
 
-            await Delay(500);
+            await Delay(250);
         }
     }
 }

@@ -7,13 +7,15 @@ namespace Server
 {
     internal class Team
     {
-        public int Id { get; }
-        public string Name { get; }
-        public bool Full { get; private set; } = false;
-        public int PlayersOnHill { get; private set; } = 0;
-        public int Points { get; private set; } = 0;
-        public TeamZone Zone;
-        public List<ServerPlayer> Players = new();
+        internal int Id { get; }
+        internal string Name { get; }
+        internal bool Full { get; private set; } = false;
+        internal int PlayersOnHill { get; private set; } = 0;
+        internal int Points { get; private set; } = 0;
+        internal TeamZone Zone;
+        internal List<KothPlayer> Members;
+
+        private readonly int MAX_MEMBER_COUNT;
 
         public Team ( )
         {
@@ -21,47 +23,95 @@ namespace Server
             Name = "";
         }
 
-        public Team ( int _team_id, string _team_name, TeamZone _zone )
+        public Team ( int _teamId, string _teamName, TeamZone _teamZone, int _maxMemberCount )
         {
-            Id = _team_id;
-            Name = _team_name;
+            Id = _teamId;
+            Name = _teamName;
             PlayersOnHill = 0;
             Points = 0;
             Full = false;
-            Zone = _zone;
+            Zone = _teamZone;
+            Members = new(_maxMemberCount);
+
+            MAX_MEMBER_COUNT = _maxMemberCount;
         }
 
-        internal void AddFlagPoint ( )
+        internal int AddFlagPoint ( )
         {
-            PlayersOnHill += 1;
+            PlayersOnHill++;
             Debug.WriteLine($"Flag point added to {Name}, total {PlayersOnHill}.");
+            return PlayersOnHill;
         }
 
-        internal void SetFlagPoints(int newval)
+        internal int SetFlagPoints(int newval)
         {
             PlayersOnHill = newval;
+            Debug.WriteLine($"Set {Name} points to {newval}.");
+            return PlayersOnHill;
         }
 
-        internal void AddTeamPoint ( )
+        internal int AddTeamPoint ( )
         {
-            Points += 1;
+            Points++;
             Debug.WriteLine($"Team point added to {Name}, total {Points}.");
+            return Points;
         }
 
-        internal void RemoveFlagPoint()
+        internal int RemoveFlagPoint()
         {
-            PlayersOnHill -= 1;
+            PlayersOnHill--;
             Debug.WriteLine($"Flag point added to {Name}, total {PlayersOnHill}.");
+            return PlayersOnHill;
         }
 
-        public Spawn GetSpawn ( )
+        internal void SetTeamFullStatus(bool isFull)
+        {
+            Full = isFull;
+        }
+
+        internal Spawn GetSpawn ( )
         {
             return new Spawn();
         }
 
-        public float[] GetPlayerSpawnLocation ( )
+        internal float[] GetPlayerSpawnLocation ( )
         {
             return GetSpawn().PlayerSpawn;
+        }
+
+        internal bool Join(KothPlayer player)
+        {
+            if (Full)
+            {
+                Debug.WriteLine($"Player {player.CfxPlayer.Name} failed to join team {Name}. Team is full.");
+                return false;
+            }
+
+            var currPlayerCount = Members.Count;
+
+            if (currPlayerCount + 1 >= MAX_MEMBER_COUNT)
+            {
+                Debug.WriteLine($"Team {Name} is now full.");
+                Full = true;
+            }
+
+            Debug.WriteLine($"Player {player.CfxPlayer.Name} joined team {Name}");
+
+            Members.Add(player);
+
+            player.Team = this;
+
+            player.SafeZoneVec3.X = Zone.SafeZone[0];
+            player.SafeZoneVec3.Y = Zone.SafeZone[1];
+            player.SafeZoneVec3.Z = Zone.SafeZone[2];
+
+            return true;
+        }
+
+        internal bool Leave(KothPlayer player)
+        {
+            Debug.WriteLine($"Player {player.CfxPlayer.Name} left team {Name}");
+            return Members.Remove(player);
         }
     }
 }

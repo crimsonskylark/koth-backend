@@ -10,27 +10,23 @@ namespace Server.Events
     {
         private static readonly uint DefaultPed = (uint)GetHashKey("mp_m_freemode_01");
         private static readonly uint DefaultWeapon = (uint)GetHashKey("weapon_compactrifle");
-        private static readonly float[] CombatZone = Server.Match.GetCurrentAO();
+        private static readonly float[] CombatZone = GameSession.Match.GetCurrentAO();
 
         internal static void OnTeamJoin ( [FromSource] Player player, string teamId )
         {
-            var isTeamValid = int.TryParse(teamId, out int ParsedTeamId);
-
-            if (string.IsNullOrEmpty(teamId) || !isTeamValid || ParsedTeamId < 0 || ParsedTeamId > 3)
+            if (string.IsNullOrEmpty(teamId) || !int.TryParse(teamId, out int ParsedTeamId) || ParsedTeamId < 0 || ParsedTeamId > 3)
             {
-                Debug.WriteLine($"[{player.Identifiers["fivem"]}] Tentou entrar em um time inválido: {ParsedTeamId}");
+                Debug.WriteLine($"[{player.Identifiers["fivem"]}] Tentou entrar em um time inválido: {teamId}");
                 return;
             }
 
-            var team = Server.Match.GetTeamById(ParsedTeamId-1);
+            var p = GameSession.GetPlayerByPlayerObj(player);
 
-            var p = Server.GetPlayerByPlayerObj(player);
-
-            if (p.JoinTeam(team))
+            if (GameSession.Match.JoinTeam(p, ParsedTeamId - 1))
             {
-                var teammates = (from other in team.Players
+                var teammates = (from other in p.Team.Members
                                  where p != other
-                                 select NetworkGetEntityOwner(other.Base.Character.Handle)).ToArray();
+                                 select NetworkGetEntityOwner(other.CfxPlayer.Character.Handle)).ToArray();
 
                 var ctxObj = JsonConvert.SerializeObject(new SpawnContext {
                     vehiclesDealerCoords = p.Team.Zone.VehDealerCoords,
@@ -38,35 +34,37 @@ namespace Server.Events
                     playerSpawnCoords = p.Team.Zone.PlayerSpawnCoords,
                     playerTeammates = teammates,
                     combatZone = CombatZone,
-                    enemyTeamNames = Server.Match.GetTeamNames().Where((t) => t != p.Team.Name).ToArray(),
+                    enemyTeamNames = GameSession.Match.GetTeamNames().Where((t) => t != p.Team.Name).ToArray(),
                     playerTeamName = p.Team.Name,
                     playerModel = DefaultPed
                 }) ;
 
-                p.Base.TriggerEvent("koth:playerJoinedTeam", ctxObj);
+                Debug.WriteLine(ctxObj);
 
-                foreach (var member in team.Players)
+                p.CfxPlayer.TriggerEvent("koth:playerJoinedTeam", ctxObj);
+
+                foreach (var member in p.Team.Members)
                 {
                     if (member != p)
                     {
-                        member.Base.TriggerEvent("koth:newTeammate", NetworkGetEntityOwner(p.Base.Character.Handle));
+                        member.CfxPlayer.TriggerEvent("koth:newTeammate", NetworkGetEntityOwner(p.CfxPlayer.Character.Handle));
                     }
                 }
 
             }
             else
             {
-                p.Base.TriggerEvent("chat:addMessage", new { args = new[] { $"Falha ao tentar entrar no time ~g~{team.Name}" } });
+                p.CfxPlayer.TriggerEvent("chat:addMessage", new { args = new[] { $"Falha ao tentar entrar no time ~g~{p.Team.Name}" } });
             }
         }
 
         internal static void OnPlayerFinishSetup ( [FromSource] Player player )
         {
-            var p = Server.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetPlayerByPlayerObj(player);
 
-            var handle = p.Base.Character.Handle;
+            var handle = p.CfxPlayer.Character.Handle;
 
-            GiveWeaponToPed(p.Base.Character.Handle,
+            GiveWeaponToPed(p.CfxPlayer.Character.Handle,
                             DefaultWeapon,
                             350,
                             false,
@@ -97,31 +95,31 @@ namespace Server.Events
 
         internal static void OnPlayerInsideSafeZone ( [FromSource] Player player )
         {
-            var p = Server.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetPlayerByPlayerObj(player);
             p.IsInsideSafeZone = true;
             Debug.WriteLine("Koth OnPlayerInsideSafeZone");
         }
 
         internal static void OnPlayerOutsideSafeZone ( [FromSource] Player player )
         {
-            var p = Server.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetPlayerByPlayerObj(player);
             p.IsInsideSafeZone = false;
             Debug.WriteLine("Koth OnPlayerOutsideSafeZone");
         }
 
         internal static void OnPlayerInsideCombatZone ( [FromSource] Player player )
         {
-            var p = Server.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetPlayerByPlayerObj(player);
             p.IsInsideAO = true;
-            Server.Match.AddFlagPointToTeam(p.Team);
+            GameSession.Match.AddFlagPointToTeam(p.Team);
             Debug.WriteLine("Koth OnPlayerInsideCombatZone");
         }
 
         internal static void OnPlayerOutsideCombatZone ( [FromSource] Player player )
         {
-            var p = Server.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetPlayerByPlayerObj(player);
             p.IsInsideAO = false;
-            Server.Match.RemoveFlagPointFromTeam(p.Team);
+            GameSession.Match.RemoveFlagPointFromTeam(p.Team);
             Debug.WriteLine("Koth OnPlayerOutsideCombatZone");
         }
     }
