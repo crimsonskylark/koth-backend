@@ -1,5 +1,6 @@
 ﻿using System;
 using CitizenFX.Core;
+using Serilog;
 
 namespace Server.Events
 {
@@ -7,13 +8,13 @@ namespace Server.Events
     {
         internal static void OnPlayerDropped([FromSource] Player player, string reason)
         {
-            var p = GameSession.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetKothPlayerByPlayerObj(player);
 
             if (p != null)
             {
                 p.LeaveTime = DateTime.UtcNow;
 
-                Debug.WriteLine($"Player {p.CfxPlayer.Handle} has left the server at {p.LeaveTime}. (Reason: {reason})");
+                Log.Logger.Information($"Player {p.Citizen.Handle} has left the server at {p.LeaveTime}. (Reason: {reason})");
 
                 GameSession.Match.LeaveTeam(p);
 
@@ -29,18 +30,18 @@ namespace Server.Events
 
                 if (GameSession.RemovePlayerFromPlayerList(player))
                 {
-                    Debug.WriteLine($"Removed player {p.CfxPlayer.Handle} from player list.");
+                    Log.Logger.Debug($"Removed player {p.Citizen.Handle} from player list.");
                 }
                 else
                 {
-                    Debug.WriteLine($"Failed to remove {p.CfxPlayer.Handle} from player list.");
+                    Log.Logger.Debug($"Failed to remove {p.Citizen.Handle} from player list.");
                 }
                 /* TODO: Save player information in database */
             }
             else
             {
                 /* Should never be reached in production. */
-                Debug.WriteLine($"[!!!] Player not found.");
+                Log.Logger.Error($"[!!!] Player not found.");
             }
         }
     }

@@ -2,11 +2,12 @@
 using CitizenFX.Core;
 using Koth.Shared;
 using Newtonsoft.Json;
+using Serilog;
 using static CitizenFX.Core.Native.API;
 
 namespace Server.Events
 {
-    internal class Koth : BaseScript
+    internal class Koth
     {
         private static readonly uint DefaultPed = (uint)GetHashKey("mp_m_freemode_01");
         private static readonly uint DefaultWeapon = (uint)GetHashKey("weapon_compactrifle");
@@ -20,13 +21,13 @@ namespace Server.Events
                 return;
             }
 
-            var p = GameSession.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetKothPlayerByPlayerObj(player);
 
             if (GameSession.Match.JoinTeam(p, ParsedTeamId - 1))
             {
                 var teammates = (from other in p.Team.Members
                                  where p != other
-                                 select NetworkGetEntityOwner(other.CfxPlayer.Character.Handle)).ToArray();
+                                 select NetworkGetEntityOwner(other.Citizen.Character.Handle)).ToArray();
 
                 var ctxObj = JsonConvert.SerializeObject(new SpawnContext {
                     vehiclesDealerCoords = p.Team.Zone.VehDealerCoords,
@@ -41,30 +42,51 @@ namespace Server.Events
 
                 Debug.WriteLine(ctxObj);
 
-                p.CfxPlayer.TriggerEvent("koth:playerJoinedTeam", ctxObj);
+                p.Citizen.TriggerEvent("koth:playerJoinedTeam", ctxObj);
 
                 foreach (var member in p.Team.Members)
                 {
                     if (member != p)
                     {
-                        member.CfxPlayer.TriggerEvent("koth:newTeammate", NetworkGetEntityOwner(p.CfxPlayer.Character.Handle));
+                        member.Citizen.TriggerEvent("koth:newTeammate", NetworkGetEntityOwner(p.Citizen.Character.Handle));
                     }
                 }
 
             }
             else
             {
-                p.CfxPlayer.TriggerEvent("chat:addMessage", new { args = new[] { $"Falha ao tentar entrar no time ~g~{p.Team.Name}" } });
+                p.Citizen.TriggerEvent("chat:addMessage", new { args = new[] { $"Falha ao tentar entrar no time ~g~{p.Team.Name}" } });
             }
+        }
+
+        internal static void OnPlayerKilledByPlayer([FromSource] Player p, int killerNetId, int victimNetId, bool killedByHeadshot)
+        {
+            var kEnt = Entity.FromNetworkId(killerNetId);
+            var vEnt = Entity.FromNetworkId(victimNetId);
+
+            if (kEnt == null || vEnt == null || kEnt is not Ped kp || vEnt is not Ped vp)
+                return;
+
+            var kObj = GameSession.GetKothPlayerByPlayerObj(kp.Owner);
+            var vObj = GameSession.GetKothPlayerByPlayerObj(vp.Owner);
+
+            if (kObj.Team != vObj.Team)
+            {
+                Log.Logger.Debug($"Player { kObj.Citizen.Name } killed enemy { (killedByHeadshot ? "with a headshot" : "with bodyshots.")}");
+
+                GameSession.Match.AddDeathToPlayer(vObj);
+                GameSession.Match.AddKillToPlayer(kObj, killedByHeadshot ? 1600 : 800);
+            }
+
         }
 
         internal static void OnPlayerFinishSetup ( [FromSource] Player player )
         {
-            var p = GameSession.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetKothPlayerByPlayerObj(player);
 
-            var handle = p.CfxPlayer.Character.Handle;
+            var handle = p.Citizen.Character.Handle;
 
-            GiveWeaponToPed(p.CfxPlayer.Character.Handle,
+            GiveWeaponToPed(p.Citizen.Character.Handle,
                             DefaultWeapon,
                             350,
                             false,
@@ -95,32 +117,32 @@ namespace Server.Events
 
         internal static void OnPlayerInsideSafeZone ( [FromSource] Player player )
         {
-            var p = GameSession.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetKothPlayerByPlayerObj(player);
             p.IsInsideSafeZone = true;
-            Debug.WriteLine("Koth OnPlayerInsideSafeZone");
+            Log.Logger.Debug($"\"{ p.Citizen.Name }\" triggered \"OnPlayerInsideSafeZone\".");
         }
 
         internal static void OnPlayerOutsideSafeZone ( [FromSource] Player player )
         {
-            var p = GameSession.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetKothPlayerByPlayerObj(player);
             p.IsInsideSafeZone = false;
-            Debug.WriteLine("Koth OnPlayerOutsideSafeZone");
+            Log.Logger.Debug($"\"{ p.Citizen.Name }\" triggered \"OnPlayerOutsideSafeZone\".");
         }
 
         internal static void OnPlayerInsideCombatZone ( [FromSource] Player player )
         {
-            var p = GameSession.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetKothPlayerByPlayerObj(player);
             p.IsInsideAO = true;
             GameSession.Match.AddFlagPointToTeam(p.Team);
-            Debug.WriteLine("Koth OnPlayerInsideCombatZone");
+            Log.Logger.Debug($"\"{ p.Citizen.Name }\" triggered \"OnPlayerInsideCombatZone\".");
         }
 
         internal static void OnPlayerOutsideCombatZone ( [FromSource] Player player )
         {
-            var p = GameSession.GetPlayerByPlayerObj(player);
+            var p = GameSession.GetKothPlayerByPlayerObj(player);
             p.IsInsideAO = false;
             GameSession.Match.RemoveFlagPointFromTeam(p.Team);
-            Debug.WriteLine("Koth OnPlayerOutsideCombatZone");
+            Log.Logger.Debug($"\"{ p.Citizen.Name }\" triggered \"OnPlayerOutsideCombatZone\".");
         }
     }
 }

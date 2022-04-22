@@ -1,11 +1,12 @@
 ﻿using System;
 using CitizenFX.Core;
+using Serilog;
 
 namespace Server.User
 {
     internal class KothPlayer
     {
-        public Player CfxPlayer { get; private set; }
+        public Player Citizen { get; private set; }
         public string License { get; private set; } = "";
         public int TotalKills { get; private set; } = 0;
         public int TotalDeaths { get; private set; } = 0;
@@ -29,11 +30,12 @@ namespace Server.User
         public Vector3 SafeZoneVec3 = new Vector3();
         public KothPlayer ( Player cfxplayer )
         {
-            CfxPlayer = cfxplayer;
+            Citizen = cfxplayer;
             JoinTime = DateTime.UtcNow;
 
-            License = Utils.GetPlayerLicense(CfxPlayer.Identifiers);
-            Debug.WriteLine($"Player joined server at {JoinTime}");
+            License = Utils.GetPlayerLicense(Citizen.Identifiers);
+
+            Log.Logger.Information($"\"{Citizen.Name}\" joined the server.\n");
         }
 
         ~KothPlayer ( )
@@ -43,48 +45,49 @@ namespace Server.User
             TotalKills += SessionKills;
             TotalDeaths += SessionDeaths;
             // SavePlayerInformation();
-            Debug.WriteLine($"Player leaving server at {LeaveTime}.");
+            Log.Logger.Information($"\"{Citizen.Name}\" left the server.\n");
         }
 
         internal void AddLevel()
         {
             Level++;
-            Debug.WriteLine($"Player gained a new level { Level }");
+            Log.Logger.Debug($"\"{ Citizen.Name }\" gained one level { Level }.");
         }
 
         internal void AddExperience(float amount)
         {
             Experience += amount;
-            Debug.WriteLine($"Player gained { amount } experience.");
+            Log.Logger.Debug($"\"{ Citizen.Name }\" gained { amount } experience.");
         }
 
         internal void AddKill()
         {
             SessionKills++;
-            Debug.WriteLine($"Added one kill to { CfxPlayer.Name }, total kills { SessionKills }");
+            Log.Logger.Debug($"\"{ Citizen.Name }\" gained one kill ({SessionKills})");
         }
 
         internal void AddDeath()
         {
             SessionDeaths++;
-            Debug.WriteLine($"Added one death to { CfxPlayer.Name }, total kills { SessionDeaths }");
+            Log.Logger.Debug($"\"{ Citizen.Name }\" died ({SessionDeaths})");
         }
 
         internal void AddMoney(int amount)
         {
             SessionMoney += amount;
-            Debug.WriteLine($"Added ${amount} to \"{CfxPlayer.Name}\"'s account, total ${TotalMoney}");
+            Log.Logger.Debug($"\"{Citizen.Name}\"'s was credited ${amount} for a total of ${TotalMoney} (${SessionMoney})");
         }
 
         internal void AddPoints(int amount = 10)
         {
             SessionPoints += amount;
-            Debug.WriteLine($"Added {amount} points to \"{CfxPlayer.Name}\"");
+            Log.Logger.Debug($"\"{Citizen.Name}\" gained {amount} points.");
         }
 
         public void Respawn ( )
         {
             var where = Team.GetPlayerSpawnLocation( );
+            Log.Logger.Debug($"\"{Citizen.Name}\" has respawned at { where }");
             //TriggerClientEvent( "koth:spawnPlayer",
             //                   where[0],
             //                   where[1],
@@ -96,6 +99,7 @@ namespace Server.User
         public bool Save ( )
         {
             /* Save information to the database */
+            Log.Logger.Information($"\"{Citizen.Name}\"'s information was saved in the database");
             return true;
         }
     }

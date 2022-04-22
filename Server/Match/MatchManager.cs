@@ -5,6 +5,7 @@ using Server.User;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Serilog;
 
 namespace Server
 {
@@ -25,6 +26,12 @@ namespace Server
         GameFinished
     }
 
+    internal enum PlayerKillRewards : int
+    {
+        Kill = 800,
+        VehicleKill = 1600
+    }
+
 
     internal class MatchManager
     {
@@ -33,7 +40,7 @@ namespace Server
         private readonly List<Team> Teams;
         private readonly SessionMap Map;
 
-        private GameSession Session;
+        private readonly GameSession Session;
 
         private Team King = null;
         private bool Tied = false;
@@ -56,7 +63,7 @@ namespace Server
 
             var tid = 0;
 
-            Debug.WriteLine($"Capacity of teams: { Teams.Capacity }, maximum players per team { maxPlayerPerTeam }");
+            Log.Logger.Information($"Capacity of teams: { Teams.Capacity }, maximum players per team { maxPlayerPerTeam }");
 
             Map.Teams.ForEach((t) => { Teams.Add(new Team(tid, t.Name, t, maxPlayerPerTeam)); tid++; });
 
@@ -113,12 +120,12 @@ namespace Server
                 if (team.PlayersOnHill == King.PlayersOnHill)
                 {
                     Tied = true;
-                    Debug.WriteLine($"Hill contested {team.Name} ({ team.PlayersOnHill }) - {King.Name} ({ King.PlayersOnHill })");
+                    Log.Logger.Information($"Hill contested {team.Name} ({ team.PlayersOnHill }) - {King.Name} ({ King.PlayersOnHill })");
                     QueueMatchUpdate(new { type = "game_state_update", update_type = GameState.HillContested, pretenders = team.Id });
                 }
                 else if (team.PlayersOnHill > King.PlayersOnHill)
                 {
-                    Debug.WriteLine($"New king: { team.Name } (old king: { King.Name })");
+                    Log.Logger.Information($"New king: { team.Name } (old king: { King.Name })");
                     King = team;
                     King.AddTeamPoint();
 
@@ -226,7 +233,7 @@ namespace Server
         internal void QueueMatchUpdate(object obj)
         {
             var _obj = JsonConvert.SerializeObject(obj);
-            Debug.WriteLine(_obj);
+            Log.Logger.Debug(_obj);
             State.Enqueue(_obj);
         }
 
@@ -235,7 +242,7 @@ namespace Server
             foreach (var obj in objs)
             {
                 var _obj = JsonConvert.SerializeObject(obj);
-                Debug.WriteLine(_obj);
+                Log.Logger.Debug(_obj);
                 State.Enqueue(_obj);
             }
         }

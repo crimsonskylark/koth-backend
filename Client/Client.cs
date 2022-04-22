@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Threading.Tasks;
 using CitizenFX.Core;
 using CitizenFX.Core.Native;
@@ -9,6 +10,13 @@ using static CitizenFX.Core.Native.API;
 
 namespace Client
 {
+
+    enum CEventNetworkEntityDmgArg : int
+    {
+        Victim = 0,
+        Killer = 1,
+        IsDamageFatal = 5
+    }
     internal class Client : BaseScript
     {
         private bool MenuOpen = true;
@@ -59,7 +67,6 @@ namespace Client
 
                 SetNuiFocus(MenuOpen, MenuOpen);
             }
-            NetworkSetFriendlyFireOption(false);
         }
 
         [EventHandler("playerSpawned")]
@@ -110,6 +117,12 @@ namespace Client
 
             Game.PlayerPed.DropsWeaponsOnDeath = false;
             TriggerServerEvent("koth:playerFinishSetup");
+        }
+
+        [EventHandler("baseevents:onPlayerKilled")]
+        private void OnPlayerKilled([FromSource] Player p, int id, ExpandoObject obj)
+        {
+            Debug.WriteLine($"On player killed triggered client-side.");
         }
 
         #endregion GameEvents
@@ -220,6 +233,32 @@ namespace Client
             }
         }
 
+        // ref: https://github.com/d0p3t/gghud/blob/cae8cc773f5a8a114f4533a30fee4ea22d9fbd70/GainedEffects.cs
+        [EventHandler("gameEventTriggered")]
+        public void OnPlayerKilled(string evName, List<object> evData)
+        {
+            if (evName != "CEventNetworkEntityDamage") return;
+
+            var killer = Entity.FromHandle(int.Parse(evData[(int)CEventNetworkEntityDmgArg.Killer].ToString()));
+
+            if (killer == null || killer.Handle != Game.PlayerPed.Handle) return;
+
+            bool isVictimDead = int.Parse(evData[(int)CEventNetworkEntityDmgArg.IsDamageFatal].ToString()) == 1;
+
+            if (!isVictimDead) return;
+
+            var victim = Entity.FromHandle(int.Parse(evData[(int)CEventNetworkEntityDmgArg.Victim].ToString()));
+
+            if (victim == null || victim is not Ped vp || !vp.IsPlayer) return;
+
+            bool headshot = false;
+
+            if (vp.Bones.LastDamaged == Bone.SKEL_Head)
+                headshot = true;
+
+            TriggerServerEvent("koth:playerKilledByPlayer", NetworkGetNetworkIdFromEntity(killer.Handle), NetworkGetNetworkIdFromEntity(victim.Handle), headshot);
+        }
+
         #endregion TickRoutines
 
         #region GameModeEvents
@@ -264,11 +303,31 @@ namespace Client
             }
 
             /* just reuse it in the future */
-            SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], heading = playerSpawnCoords[3], model = spawn.playerModel, skipFade = false });
+            SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new
+            {
+                x = playerSpawnCoords[0],
+                y = playerSpawnCoords[1],
+                z = playerSpawnCoords[2],
+                heading = playerSpawnCoords[3],
+                model = spawn.playerModel,
+                skipFade = false
+            });
 
             Exports["spawnmanager"].spawnPlayer(SessionSpawnPoint);
 
-            Exports["polyzone"].setupGameZones(new { x = playerSpawnCoords[0], y = playerSpawnCoords[1], z = playerSpawnCoords[2], h = playerSpawnCoords[3] }, new { x = AO[0], y = AO[1], z = AO[2] });
+            Exports["polyzone"].setupGameZones(new
+            {
+                x = playerSpawnCoords[0],
+                y = playerSpawnCoords[1],
+                z = playerSpawnCoords[2],
+                h = playerSpawnCoords[3]
+            },
+            new
+            {
+                x = AO[0],
+                y = AO[1],
+                z = AO[2]
+            });
 
             SendNuiMessage(SerializedFinishMsg);
             SetNuiFocus(false, false);

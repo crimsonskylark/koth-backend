@@ -2,6 +2,7 @@
 using CitizenFX.Core;
 using Server.Map;
 using Server.User;
+using Serilog;
 
 namespace Server
 {
@@ -39,28 +40,28 @@ namespace Server
         internal int AddFlagPoint ( )
         {
             PlayersOnHill++;
-            Debug.WriteLine($"Flag point added to {Name}, total {PlayersOnHill}.");
+            Log.Logger.Debug($"Flag point added to {Name}, total {PlayersOnHill}.");
             return PlayersOnHill;
         }
 
         internal int SetFlagPoints(int newval)
         {
             PlayersOnHill = newval;
-            Debug.WriteLine($"Set {Name} points to {newval}.");
+            Log.Logger.Debug($"Set {Name} points to {newval}.");
             return PlayersOnHill;
         }
 
         internal int AddTeamPoint ( )
         {
             Points++;
-            Debug.WriteLine($"Team point added to {Name}, total {Points}.");
+            Log.Logger.Debug($"Team point added to {Name}, total {Points}.");
             return Points;
         }
 
         internal int RemoveFlagPoint()
         {
             PlayersOnHill--;
-            Debug.WriteLine($"Flag point added to {Name}, total {PlayersOnHill}.");
+            Log.Logger.Debug($"Flag point added to {Name}, total {PlayersOnHill}.");
             return PlayersOnHill;
         }
 
@@ -83,7 +84,7 @@ namespace Server
         {
             if (Full)
             {
-                Debug.WriteLine($"Player {player.CfxPlayer.Name} failed to join team {Name}. Team is full.");
+                Log.Logger.Debug($"Player {player.Citizen.Name} failed to join team {Name}. Team is full.");
                 return false;
             }
 
@@ -91,11 +92,11 @@ namespace Server
 
             if (currPlayerCount + 1 >= MAX_MEMBER_COUNT)
             {
-                Debug.WriteLine($"Team {Name} is now full.");
+                Log.Logger.Debug($"Team {Name} is now full.");
                 Full = true;
             }
 
-            Debug.WriteLine($"Player {player.CfxPlayer.Name} joined team {Name}");
+            Log.Logger.Debug($"Player {player.Citizen.Name} joined team {Name}");
 
             Members.Add(player);
 
@@ -110,8 +111,13 @@ namespace Server
 
         internal bool Leave(KothPlayer player)
         {
-            Debug.WriteLine($"Player {player.CfxPlayer.Name} left team {Name}");
+            Log.Logger.Debug($"Player {player.Citizen.Name} left team {Name}");
             return Members.Remove(player);
+        }
+
+        override public string ToString()
+        {
+            return Name;
         }
     }
 }
