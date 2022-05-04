@@ -1,8 +1,7 @@
-﻿using System.Collections.Generic;
-using CitizenFX.Core;
+﻿using Serilog;
 using Server.Map;
 using Server.User;
-using Serilog;
+using System.Collections.Generic;
 
 namespace Server
 {
@@ -18,13 +17,13 @@ namespace Server
 
         private readonly int MAX_MEMBER_COUNT;
 
-        public Team ( )
+        public Team()
         {
             Id = -1;
             Name = "";
         }
 
-        public Team ( int _teamId, string _teamName, TeamZone _teamZone, int _maxMemberCount )
+        public Team(int _teamId, string _teamName, TeamZone _teamZone, int _maxMemberCount)
         {
             Id = _teamId;
             Name = _teamName;
@@ -37,7 +36,7 @@ namespace Server
             MAX_MEMBER_COUNT = _maxMemberCount;
         }
 
-        internal int AddFlagPoint ( )
+        internal int AddFlagPoint()
         {
             PlayersOnHill++;
             Log.Logger.Debug($"Flag point added to {Name}, total {PlayersOnHill}.");
@@ -51,7 +50,7 @@ namespace Server
             return PlayersOnHill;
         }
 
-        internal int AddTeamPoint ( )
+        internal int AddTeamPoint()
         {
             Points++;
             Log.Logger.Debug($"Team point added to {Name}, total {Points}.");
@@ -70,12 +69,12 @@ namespace Server
             Full = isFull;
         }
 
-        internal Spawn GetSpawn ( )
+        internal Spawn GetSpawn()
         {
             return new Spawn();
         }
 
-        internal float[] GetPlayerSpawnLocation ( )
+        internal float[] GetPlayerSpawnLocation()
         {
             return GetSpawn().PlayerSpawn;
         }

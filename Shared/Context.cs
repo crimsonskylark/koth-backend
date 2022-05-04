@@ -11,7 +11,7 @@
         public float[] VehiclesDealerCoords { get; set; }
         public int VehiclesDealerPedHandle;
 
-        public override string ToString ( )
+        public override string ToString()
         {
             return $"SpawnInformation({PlayerSpawnInformation[0]}, {PlayerSpawnInformation[1]}, {PlayerSpawnInformation[2]}";
         }

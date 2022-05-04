@@ -1,6 +1,4 @@
-﻿using CitizenFX.Core;
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using static CitizenFX.Core.Native.API;
 
@@ -16,10 +14,10 @@ namespace Server
         private int _vehiclesDealerProp { get; set; }
         public int VehicleDealerProp { get => _vehiclesDealerProp; private set => _vehiclesDealerProp = value; }
 
-        public CommandPost ( )
-        {}
+        public CommandPost()
+        { }
 
-        public Spawn GetSpawnPoint ( )
+        public Spawn GetSpawnPoint()
         {
             return SpawnPoints.Peek();
         }

@@ -1,8 +1,8 @@
-﻿using System.Linq;
-using CitizenFX.Core;
+﻿using CitizenFX.Core;
 using Koth.Shared;
 using Newtonsoft.Json;
 using Serilog;
+using System.Linq;
 using static CitizenFX.Core.Native.API;
 
 namespace Server.Events
@@ -13,7 +13,7 @@ namespace Server.Events
         private static readonly uint DefaultWeapon = (uint)GetHashKey("weapon_compactrifle");
         private static readonly float[] CombatZone = GameSession.Match.GetCurrentAO();
 
-        internal static void OnTeamJoin ( [FromSource] Player player, string teamId )
+        internal static void OnTeamJoin([FromSource] Player player, string teamId)
         {
             if (string.IsNullOrEmpty(teamId) || !int.TryParse(teamId, out int ParsedTeamId) || ParsedTeamId < 0 || ParsedTeamId > 3)
             {
@@ -27,9 +27,10 @@ namespace Server.Events
             {
                 var teammates = (from other in p.Team.Members
                                  where p != other
-                                 select NetworkGetEntityOwner(other.Citizen.Character.Handle)).ToArray();
+                                 select other.Citizen.Character.NetworkId).ToArray();
 
-                var ctxObj = JsonConvert.SerializeObject(new SpawnContext {
+                var ctxObj = JsonConvert.SerializeObject(new SpawnContext
+                {
                     vehiclesDealerCoords = p.Team.Zone.VehDealerCoords,
                     vehiclesDealerPropCoords = p.Team.Zone.VehDealerPropCoords,
                     playerSpawnCoords = p.Team.Zone.PlayerSpawnCoords,
@@ -38,7 +39,7 @@ namespace Server.Events
                     enemyTeamNames = GameSession.Match.GetTeamNames().Where((t) => t != p.Team.Name).ToArray(),
                     playerTeamName = p.Team.Name,
                     playerModel = DefaultPed
-                }) ;
+                });
 
                 Debug.WriteLine(ctxObj);
 
@@ -48,7 +49,8 @@ namespace Server.Events
                 {
                     if (member != p)
                     {
-                        member.Citizen.TriggerEvent("koth:newTeammate", NetworkGetEntityOwner(p.Citizen.Character.Handle));
+                        Debug.WriteLine($"Triggering newTeammate { member.Citizen.Character.NetworkId}");
+                        member.Citizen.TriggerEvent("koth:newTeammate", member.Citizen.Character.NetworkId);
                     }
                 }
 
@@ -64,7 +66,10 @@ namespace Server.Events
             var kEnt = Entity.FromNetworkId(killerNetId);
             var vEnt = Entity.FromNetworkId(victimNetId);
 
-            if (kEnt == null || vEnt == null || kEnt is not Ped kp || vEnt is not Ped vp)
+            if (kEnt == null || vEnt == null || kEnt is not Ped kp || vEnt is not Ped vp || !IsPedAPlayer(kp.Handle) || !IsPedAPlayer(vp.Handle))
+                return;
+
+            if (GetEntityHealth(kp.Handle) != 0 && GetEntityHealth(vp.Handle) != 0)
                 return;
 
             var kObj = GameSession.GetKothPlayerByPlayerObj(kp.Owner);
@@ -75,12 +80,23 @@ namespace Server.Events
                 Log.Logger.Debug($"Player { kObj.Citizen.Name } killed enemy { (killedByHeadshot ? "with a headshot" : "with bodyshots.")}");
 
                 GameSession.Match.AddDeathToPlayer(vObj);
-                GameSession.Match.AddKillToPlayer(kObj, killedByHeadshot ? 1600 : 800);
+                GameSession.Match.AddKillToPlayer(kObj,
+                    killedByHeadshot ? (int)PlayerKillRewards.Kill * 2 : (int)PlayerKillRewards.Kill);
+
+                GameSession.Match.QueueMatchUpdate(new
+                {
+                    type = "game_state_update",
+                    update_type = GameState.PlayerKillDeath,
+                    killer = killerNetId,
+                    victim = victimNetId,
+                    headshot = killedByHeadshot
+                });
+
             }
 
         }
 
-        internal static void OnPlayerFinishSetup ( [FromSource] Player player )
+        internal static void OnPlayerFinishSetup([FromSource] Player player)
         {
             var p = GameSession.GetKothPlayerByPlayerObj(player);
 
@@ -115,21 +131,21 @@ namespace Server.Events
             SetPedComponentVariation(handle, 11, uniform[5][0], uniform[5][1], 0);
         }
 
-        internal static void OnPlayerInsideSafeZone ( [FromSource] Player player )
+        internal static void OnPlayerInsideSafeZone([FromSource] Player player)
         {
             var p = GameSession.GetKothPlayerByPlayerObj(player);
             p.IsInsideSafeZone = true;
             Log.Logger.Debug($"\"{ p.Citizen.Name }\" triggered \"OnPlayerInsideSafeZone\".");
         }
 
-        internal static void OnPlayerOutsideSafeZone ( [FromSource] Player player )
+        internal static void OnPlayerOutsideSafeZone([FromSource] Player player)
         {
             var p = GameSession.GetKothPlayerByPlayerObj(player);
             p.IsInsideSafeZone = false;
             Log.Logger.Debug($"\"{ p.Citizen.Name }\" triggered \"OnPlayerOutsideSafeZone\".");
         }
 
-        internal static void OnPlayerInsideCombatZone ( [FromSource] Player player )
+        internal static void OnPlayerInsideCombatZone([FromSource] Player player)
         {
             var p = GameSession.GetKothPlayerByPlayerObj(player);
             p.IsInsideAO = true;
@@ -137,7 +153,7 @@ namespace Server.Events
             Log.Logger.Debug($"\"{ p.Citizen.Name }\" triggered \"OnPlayerInsideCombatZone\".");
         }
 
-        internal static void OnPlayerOutsideCombatZone ( [FromSource] Player player )
+        internal static void OnPlayerOutsideCombatZone([FromSource] Player player)
         {
             var p = GameSession.GetKothPlayerByPlayerObj(player);
             p.IsInsideAO = false;

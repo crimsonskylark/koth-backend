@@ -1,6 +1,6 @@
-﻿using System;
-using CitizenFX.Core;
+﻿using CitizenFX.Core;
 using Serilog;
+using System;
 
 namespace Server.User
 {
@@ -19,18 +19,18 @@ namespace Server.User
         public Team Team { get; set; } = null;
         public DateTime JoinTime { get; private set; }
         public DateTime LeaveTime { get; set; }
-        public float Experience { get; private set; } = 0.0f;
+        public int Experience { get; private set; } = 0;
         public int Level { get; private set; } = 0;
         public bool CanBeRevived { get; private set; } = true;
         public bool IsInsideSafeZone { get; set; } = true;
         public bool IsInsideAO { get; set; } = false;
-        
 
         // cached and used for canculations
         public Vector3 SafeZoneVec3 = new Vector3();
-        public KothPlayer ( Player cfxplayer )
+
+        public KothPlayer(Player _citizen)
         {
-            Citizen = cfxplayer;
+            Citizen = _citizen;
             JoinTime = DateTime.UtcNow;
 
             License = Utils.GetPlayerLicense(Citizen.Identifiers);
@@ -38,7 +38,7 @@ namespace Server.User
             Log.Logger.Information($"\"{Citizen.Name}\" joined the server.\n");
         }
 
-        ~KothPlayer ( )
+        ~KothPlayer()
         {
             LeaveTime = DateTime.UtcNow;
             TotalMoney += SessionMoney;
@@ -54,10 +54,10 @@ namespace Server.User
             Log.Logger.Debug($"\"{ Citizen.Name }\" gained one level { Level }.");
         }
 
-        internal void AddExperience(float amount)
+        internal void AddExperience(int _amount)
         {
-            Experience += amount;
-            Log.Logger.Debug($"\"{ Citizen.Name }\" gained { amount } experience.");
+            Experience += _amount;
+            Log.Logger.Debug($"\"{ Citizen.Name }\" gained { _amount } experience.");
         }
 
         internal void AddKill()
@@ -72,21 +72,21 @@ namespace Server.User
             Log.Logger.Debug($"\"{ Citizen.Name }\" died ({SessionDeaths})");
         }
 
-        internal void AddMoney(int amount)
+        internal void AddMoney(int _amount)
         {
-            SessionMoney += amount;
-            Log.Logger.Debug($"\"{Citizen.Name}\"'s was credited ${amount} for a total of ${TotalMoney} (${SessionMoney})");
+            SessionMoney += _amount;
+            Log.Logger.Debug($"\"{Citizen.Name}\"'s was credited ${_amount} for a total of ${TotalMoney} (${SessionMoney})");
         }
 
-        internal void AddPoints(int amount = 10)
+        internal void AddPoints(int _amount = 10)
         {
-            SessionPoints += amount;
-            Log.Logger.Debug($"\"{Citizen.Name}\" gained {amount} points.");
+            SessionPoints += _amount;
+            Log.Logger.Debug($"\"{Citizen.Name}\" gained {_amount} points.");
         }
 
-        public void Respawn ( )
+        public void Respawn()
         {
-            var where = Team.GetPlayerSpawnLocation( );
+            var where = Team.GetPlayerSpawnLocation();
             Log.Logger.Debug($"\"{Citizen.Name}\" has respawned at { where }");
             //TriggerClientEvent( "koth:spawnPlayer",
             //                   where[0],
@@ -94,13 +94,6 @@ namespace Server.User
             //                   where[2],
             //                   where[3],
             //                   CurrentTeam. );
-        }
-
-        public bool Save ( )
-        {
-            /* Save information to the database */
-            Log.Logger.Information($"\"{Citizen.Name}\"'s information was saved in the database");
-            return true;
         }
     }
 }

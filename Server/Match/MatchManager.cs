@@ -1,24 +1,20 @@
 ﻿using CitizenFX.Core;
 using Newtonsoft.Json;
+using Serilog;
 using Server.Map;
 using Server.User;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Serilog;
 
 namespace Server
 {
     internal enum GameState : int
     {
-        PlayerJoin,
-        PlayerLeave,
-        PlayerDeath,
-        PlayerKill,
-        PlayerOnHill,
-        PlayerOffHill,
-        PlayerTeamJoin,
-        PlayerTeamLeave,
+        PlayerJoinLeave,
+        PlayerKillDeath,
+        PlayerOnOffHill,
+        PlayerTeamJoinLeave,
         TeamPoint,
         HillCaptured,
         HillLost,
@@ -97,7 +93,12 @@ namespace Server
 
             team.AddFlagPoint();
 
-            QueueMatchUpdate(new { type = "game_state_update", update_type = GameState.PlayerOnHill, teamId = team.Id, membersInZone = team.PlayersOnHill });
+            QueueMatchUpdate(new { 
+                type = "game_state_update", 
+                update_type = GameState.PlayerOnOffHill, 
+                teamId = team.Id, 
+                membersInZone = team.PlayersOnHill,
+            });
 
             if (King == null)
             {
@@ -192,7 +193,12 @@ namespace Server
                 team.SetFlagPoints(0);
             }
 
-            QueueMatchUpdate(new { type = "game_state_update", update_type = GameState.PlayerOffHill, teamId = team.Id, membersInZone = team.PlayersOnHill });
+            QueueMatchUpdate(new {
+                type = "game_state_update", 
+                update_type = GameState.PlayerOnOffHill, 
+                teamId = team.Id, 
+                membersInZone = team.PlayersOnHill 
+            });
         }
 
         internal void AddPoinToTeam(Team t)
@@ -211,7 +217,14 @@ namespace Server
 
             if (status)
             {
-                QueueMatchUpdate(new { type = "game_state_update", update_type = GameState.PlayerTeamJoin, teamId = team.Id });
+                QueueMatchUpdate(new { 
+                    type = "game_state_update", 
+                    update_type = GameState.PlayerTeamJoinLeave, 
+                    teamId = team.Id,
+                    netId = player.Citizen.Character.NetworkId,
+                    playerName = player.Citizen.Name,
+                    joining = true
+                });
             }
 
             return status;
@@ -219,11 +232,17 @@ namespace Server
 
         public bool LeaveTeam(KothPlayer player)
         {
-            var prevTeamId = player.Team.Id;
+            var teamId = player.Team.Id;
             var status = player.Team.Leave(player);
             if (status)
             {
-                QueueMatchUpdate(new { type = "game_state_update", update_type = GameState.PlayerTeamLeave, teamId = prevTeamId });
+                QueueMatchUpdate(new { 
+                    type = "game_state_update", 
+                    update_type = GameState.PlayerTeamJoinLeave,
+                    teamId,
+                    netId = player.Citizen.Character.NetworkId,
+                    joining = false
+                });
             }
             return status;
         }
@@ -265,7 +284,7 @@ namespace Server
             p.AddMoney(amount);
         }
 
-        internal void AddExperienceToPlayer(KothPlayer p, float amount)
+        internal void AddExperienceToPlayer(KothPlayer p, int amount)
         {
             p.AddExperience(amount);
         }

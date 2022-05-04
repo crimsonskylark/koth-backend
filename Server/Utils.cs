@@ -10,7 +10,7 @@ namespace Server
             return identifiers[type];
         }
 
-        public static float lerp(int v0, int v1, float t) 
+        public static float lerp(int v0, int v1, float t)
         {
             return (1 - t) * v0 + t * v1;
         }

@@ -1,11 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Dynamic;
-using System.Threading.Tasks;
-using CitizenFX.Core;
+﻿using CitizenFX.Core;
 using CitizenFX.Core.Native;
 using Koth.Shared;
 using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Dynamic;
+using System.Threading.Tasks;
 using static CitizenFX.Core.Native.API;
 
 namespace Client
@@ -160,8 +160,6 @@ namespace Client
 
             var team_id = (teamIdObj as string) ?? "";
 
-            Debug.WriteLine($"Trying to join team {team_id}");
-
             TriggerServerEvent("koth:playerTeamJoin", team_id);
 
             cb(new
@@ -199,13 +197,20 @@ namespace Client
         }
 
         [Tick]
-        private async Task TestRoutine()
+        private async Task RemovePopulation()
         {
-            var pos = Game.PlayerPed.Position;
-            var next = pos + (Game.PlayerPed.ForwardVector * 25.0f);
-            DrawLine(pos.X, pos.Y, pos.Z + 0.4f, next.X, next.Y, next.Z + 0.4f, 255, 255, 255, 255);
+            SetVehicleDensityMultiplierThisFrame(0f);
+            SetPedDensityMultiplierThisFrame(0f);
+            SetRandomVehicleDensityMultiplierThisFrame(0f);
+            SetParkedVehicleDensityMultiplierThisFrame(0f);
+            SetScenarioPedDensityMultiplierThisFrame(0f, 0f);
 
-            await Delay(0);
+            Vector3 PlayerPos = Game.Player.Character.Position;
+            RemoveVehiclesFromGeneratorsInArea(PlayerPos.X - 500f, PlayerPos.Y - 500f, PlayerPos.Z - 500f, PlayerPos.X + 500f, PlayerPos.Y + 500f, PlayerPos.Z + 500f, 0);
+
+            SetGarbageTrucks(false);
+            SetRandomBoats(false);
+            
         }
 
         [Tick]
@@ -233,6 +238,22 @@ namespace Client
             }
         }
 
+        //[Tick]
+        //private async Task Random()
+        //{
+        //    var newP = new Vector3();
+        //    while (!GetSafeCoordForPed(106.72f, -998.73f, 29.4f, false, ref newP, 16))
+        //    {
+        //        Debug.WriteLine($"Safe coordinates");
+        //        await Delay(100);
+        //    }
+
+        //    Debug.WriteLine($"Found position: { newP }");
+        //    SetEntityCoords(PlayerPedId(), newP.X, newP.Y, newP.Z, false, false, false, true);
+
+        //    await Delay(1000);
+        //}
+
         // ref: https://github.com/d0p3t/gghud/blob/cae8cc773f5a8a114f4533a30fee4ea22d9fbd70/GainedEffects.cs
         [EventHandler("gameEventTriggered")]
         public void OnPlayerKilled(string evName, List<object> evData)
@@ -251,12 +272,10 @@ namespace Client
 
             if (victim == null || victim is not Ped vp || !vp.IsPlayer) return;
 
-            bool headshot = false;
-
-            if (vp.Bones.LastDamaged == Bone.SKEL_Head)
-                headshot = true;
-
-            TriggerServerEvent("koth:playerKilledByPlayer", NetworkGetNetworkIdFromEntity(killer.Handle), NetworkGetNetworkIdFromEntity(victim.Handle), headshot);
+            TriggerServerEvent("koth:playerKilledByPlayer",
+                               killer.NetworkId,
+                               victim.NetworkId,
+                               vp.Bones.LastDamaged == Bone.SKEL_Head);
         }
 
         #endregion TickRoutines
@@ -292,15 +311,17 @@ namespace Client
             }
 
             AO = spawn.combatZone;
+            SetNewWaypoint(AO[0], AO[1]);
 
             foreach (var teammate in spawn.playerTeammates)
             {
                 if (teammate != 0 && NetworkIsPlayerConnected(teammate))
                 {
-                    var b = AddBlipForEntity(Players[teammate].Character.Handle);
-                    SetBlipAsFriendly(b, true);
+                    var b = Players[teammate].Character.AttachBlip();
+                    b.IsFriendly = true;
                 }
             }
+
 
             /* just reuse it in the future */
             SessionSpawnPoint = Exports["spawnmanager"].addSpawnPoint(new
@@ -342,9 +363,9 @@ namespace Client
         [EventHandler("koth:safeHeal")]
         private void OnSafeHeal(int amount)
         {
-            if (GetEntityHealth(Game.PlayerPed.Handle) < 200)
+            if (Game.PlayerPed.Health < 200)
             {
-                SetEntityHealth(Game.PlayerPed.Handle, amount);
+                Game.PlayerPed.Health = amount;
             }
         }
 
@@ -353,9 +374,8 @@ namespace Client
         {
             if (netid != 0)
             {
-                var p = Players[netid];
-                var b = AddBlipForEntity(p.Character.Handle);
-                SetBlipAsFriendly(b, true);
+                var b = Players[netid].Character;
+                //if (b != null) 
             }
         }
 

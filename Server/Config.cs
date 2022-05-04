@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace Server
+﻿namespace Server
 {
     internal class Config
     {
